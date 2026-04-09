@@ -1,6 +1,6 @@
 {
   "name": "@benvinegar/termdraw",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Object-based terminal illustrator for diagrams, UI mocks, and terminal-native graphics.",
   "keywords": [
     "ascii-art",

@@ -23,7 +23,7 @@ import {
 } from "./draw-state.js";
 
 const MIN_WIDTH = 45;
-const MIN_HEIGHT = 24;
+const MIN_HEIGHT = 27;
 const TOOL_PALETTE_WIDTH = 17;
 const TOOL_BUTTON_WIDTH = 13;
 const BOX_STYLE_BUTTON_WIDTH = 10;
@@ -38,6 +38,7 @@ const COLORS = {
   border: RGBA.fromHex("#475569"),
   text: RGBA.fromHex("#e2e8f0"),
   dim: RGBA.fromHex("#94a3b8"),
+  select: RGBA.fromHex("#38bdf8"),
   accent: RGBA.fromHex("#22d3ee"),
   warning: RGBA.fromHex("#f59e0b"),
   success: RGBA.fromHex("#22c55e"),
@@ -631,15 +632,26 @@ export class TermDrawRenderable extends FrameBufferRenderable {
   private getToolButtons(layout: AppLayout): ToolButton[] {
     const buttonLeft = this.getPaletteButtonLeft(layout);
     const firstTop = layout.bodyTop;
-    const lineTop = firstTop + TOOL_BUTTON_HEIGHT + BOX_STYLE_ROW_COUNT;
+    const boxTop = firstTop + TOOL_BUTTON_HEIGHT;
+    const lineTop = boxTop + TOOL_BUTTON_HEIGHT + BOX_STYLE_ROW_COUNT;
     const paintTop = lineTop + TOOL_BUTTON_HEIGHT;
     const textTop = paintTop + TOOL_BUTTON_HEIGHT;
 
     return [
       {
-        mode: "box",
+        mode: "select",
         left: buttonLeft,
         top: firstTop,
+        width: TOOL_BUTTON_WIDTH,
+        height: TOOL_BUTTON_HEIGHT,
+        icon: "◎",
+        label: "Select",
+        color: COLORS.select,
+      },
+      {
+        mode: "box",
+        left: buttonLeft,
+        top: boxTop,
         width: TOOL_BUTTON_WIDTH,
         height: TOOL_BUTTON_HEIGHT,
         icon: "▣",
@@ -682,7 +694,8 @@ export class TermDrawRenderable extends FrameBufferRenderable {
   private getBoxStyleButtons(layout: AppLayout): BoxStyleButton[] {
     const buttonLeft = this.getPaletteButtonLeft(layout);
     const firstTop = layout.bodyTop;
-    const stylesTop = firstTop + TOOL_BUTTON_HEIGHT;
+    const boxTop = firstTop + TOOL_BUTTON_HEIGHT;
+    const stylesTop = boxTop + TOOL_BUTTON_HEIGHT;
 
     return BOX_STYLE_OPTIONS.map((option, index) => ({
       style: option.style,
@@ -697,7 +710,8 @@ export class TermDrawRenderable extends FrameBufferRenderable {
   private getColorSwatches(layout: AppLayout): ColorSwatch[] {
     const buttonLeft = this.getPaletteButtonLeft(layout);
     const firstTop = layout.bodyTop;
-    const lineTop = firstTop + TOOL_BUTTON_HEIGHT + BOX_STYLE_ROW_COUNT;
+    const boxTop = firstTop + TOOL_BUTTON_HEIGHT;
+    const lineTop = boxTop + TOOL_BUTTON_HEIGHT + BOX_STYLE_ROW_COUNT;
     const paintTop = lineTop + TOOL_BUTTON_HEIGHT;
     const textTop = paintTop + TOOL_BUTTON_HEIGHT;
     const colorTop = textTop + TOOL_BUTTON_HEIGHT + 1;
@@ -788,13 +802,15 @@ export class TermDrawRenderable extends FrameBufferRenderable {
 
     const modeLabel = this.state.getModeLabel();
     const modeColor =
-      this.state.currentMode === "line"
-        ? COLORS.accent
-        : this.state.currentMode === "box"
-          ? COLORS.warning
-          : this.state.currentMode === "paint"
-            ? COLORS.paint
-            : COLORS.success;
+      this.state.currentMode === "select"
+        ? COLORS.select
+        : this.state.currentMode === "line"
+          ? COLORS.accent
+          : this.state.currentMode === "box"
+            ? COLORS.warning
+            : this.state.currentMode === "paint"
+              ? COLORS.paint
+              : COLORS.success;
     x = drawSegment(
       this.frameBuffer,
       x,
@@ -864,7 +880,7 @@ export class TermDrawRenderable extends FrameBufferRenderable {
 
   private drawFooterRow(layout: AppLayout): void {
     const text =
-      "Right palette tools/styles/colors • click objects to move • drag box corners / line endpoints to edit • Esc deselect • Ctrl+Q quit";
+      "Right palette tools/styles/colors • select tool can marquee multiple objects • drag box corners / line endpoints to edit • Esc deselect • Ctrl+Q quit";
     const combined = `${text}  ${this.state.currentStatus}`;
     const padded = padToWidth(combined, Math.max(1, this.width - 2));
     this.frameBuffer.drawText(padded, 1, layout.footerY, COLORS.dim, COLORS.panel);
@@ -951,7 +967,8 @@ export class TermDrawRenderable extends FrameBufferRenderable {
   private drawColorPicker(layout: AppLayout): void {
     const buttonLeft = this.getPaletteButtonLeft(layout);
     const firstTop = layout.bodyTop;
-    const lineTop = firstTop + TOOL_BUTTON_HEIGHT + BOX_STYLE_ROW_COUNT;
+    const boxTop = firstTop + TOOL_BUTTON_HEIGHT;
+    const lineTop = boxTop + TOOL_BUTTON_HEIGHT + BOX_STYLE_ROW_COUNT;
     const paintTop = lineTop + TOOL_BUTTON_HEIGHT;
     const textTop = paintTop + TOOL_BUTTON_HEIGHT;
     const colorLabelTop = textTop + TOOL_BUTTON_HEIGHT;
@@ -980,6 +997,7 @@ export class TermDrawRenderable extends FrameBufferRenderable {
 
   private drawCanvas(): void {
     const preview = this.state.getActivePreviewCharacters();
+    const marqueeChars = this.state.getSelectionMarqueeCharacters();
     const selectedCells = this.state.getSelectedCellKeys();
     const handleChars = this.state.getSelectionHandleCharacters();
 
@@ -989,23 +1007,27 @@ export class TermDrawRenderable extends FrameBufferRenderable {
       for (let x = 0; x < this.state.width; x += 1) {
         const key = `${x},${y}`;
         const handleChar = handleChars.get(key);
+        const marqueeChar = marqueeChars.get(key);
         const previewChar = preview.get(key);
-        const cell = handleChar ?? previewChar ?? this.state.getCompositeCell(x, y);
+        const cell = handleChar ?? marqueeChar ?? previewChar ?? this.state.getCompositeCell(x, y);
         const cellColor = this.state.getCompositeColor(x, y);
         const isCursor = x === this.state.currentCursorX && y === this.state.currentCursorY;
         const isSelected = selectedCells.has(key);
         const isHandle = handleChar !== undefined;
+        const isMarquee = marqueeChar !== undefined;
         const fg = isCursor
           ? COLORS.cursorFg
           : isHandle
             ? COLORS.handleFg
-            : isSelected
-              ? COLORS.selectionFg
-              : previewChar
-                ? getInkColorValue(this.state.currentInkColor)
-                : cellColor
-                  ? getInkColorValue(cellColor)
-                  : COLORS.text;
+            : isMarquee
+              ? COLORS.select
+              : isSelected
+                ? COLORS.selectionFg
+                : previewChar
+                  ? getInkColorValue(this.state.currentInkColor)
+                  : cellColor
+                    ? getInkColorValue(cellColor)
+                    : COLORS.text;
         const bg = isCursor
           ? COLORS.cursorBg
           : isHandle
@@ -1014,7 +1036,9 @@ export class TermDrawRenderable extends FrameBufferRenderable {
               ? COLORS.selectionBg
               : COLORS.panel;
         const attributes =
-          isCursor || isSelected || isHandle ? TextAttributes.BOLD : TextAttributes.NONE;
+          isCursor || isSelected || isHandle || isMarquee
+            ? TextAttributes.BOLD
+            : TextAttributes.NONE;
         this.frameBuffer.setCell(x + this.state.canvasLeftCol, rowY, cell, fg, bg, attributes);
       }
     }
@@ -1113,8 +1137,9 @@ export function buildHelpText(binaryName = "termdraw"): string {
   return truncateToCells(
     `${binaryName} [--output file] [--fenced|--plain]\n\n` +
       `Controls:\n` +
-      `  right palette   click Box / Line / Paint / Text, box styles, and colors\n` +
-      `  Ctrl+T / Tab    cycle box / line / paint / text\n` +
+      `  right palette   click Select / Box / Line / Paint / Text, box styles, and colors\n` +
+      `  Ctrl+T / Tab    cycle select / box / line / paint / text\n` +
+      `  select tool     click to select, drag empty space to marquee-select multiple objects\n` +
       `  click objects   select and move them\n` +
       `  drag handles    resize boxes / adjust line endpoints\n` +
       `  selected text   shows a virtual selection box\n` +

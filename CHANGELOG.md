@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.2.0
+
+Adds a dedicated select tool for selection-first editing workflows.
+
+### Highlights
+
+- new Select tool in the right-side palette
+- click-drag marquee selection for multiple objects
+- moving, deleting, and recoloring now work across multi-selection
+- selected groups move together while keeping single-object resize and endpoint handles
+- updated full-app layout sizing and test coverage for the new selection flow
+
 ## v0.1.0
 
 Initial public release of termDRAW!.

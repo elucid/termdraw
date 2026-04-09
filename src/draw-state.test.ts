@@ -473,6 +473,42 @@ describe("DrawState", () => {
     expect(state.getCompositeCell(4, 1)).toBe("!");
   });
 
+  test("select mode can marquee-select and move multiple objects", () => {
+    const state = new DrawState(40, 16);
+    state.setMode("box");
+
+    const firstStart = canvasPoint(state, 0, 0);
+    const firstEnd = canvasPoint(state, 3, 2);
+    state.handlePointerEvent({ type: "down", button: MouseButton.LEFT, ...firstStart });
+    state.handlePointerEvent({ type: "drag", button: MouseButton.LEFT, ...firstEnd });
+    state.handlePointerEvent({ type: "up", button: MouseButton.LEFT, ...firstEnd });
+
+    const secondStart = canvasPoint(state, 6, 0);
+    const secondEnd = canvasPoint(state, 9, 2);
+    state.handlePointerEvent({ type: "down", button: MouseButton.LEFT, ...secondStart });
+    state.handlePointerEvent({ type: "drag", button: MouseButton.LEFT, ...secondEnd });
+    state.handlePointerEvent({ type: "up", button: MouseButton.LEFT, ...secondEnd });
+
+    state.setMode("select");
+    const marqueeStart = canvasPoint(state, 0, 3);
+    const marqueeEnd = canvasPoint(state, 9, 0);
+    state.handlePointerEvent({ type: "down", button: MouseButton.LEFT, ...marqueeStart });
+    state.handlePointerEvent({ type: "drag", button: MouseButton.LEFT, ...marqueeEnd });
+    state.handlePointerEvent({ type: "up", button: MouseButton.LEFT, ...marqueeEnd });
+
+    const selected = state.getSelectedCellKeys();
+    expect(selected.has("0,0")).toBe(true);
+    expect(selected.has("9,2")).toBe(true);
+    expect(state.getSelectionHandleCharacters().size).toBe(0);
+
+    state.moveSelectedObjectBy(2, 2);
+
+    expect(state.getCompositeCell(0, 0)).toBe(" ");
+    expect(state.getCompositeCell(6, 0)).toBe(" ");
+    expect(state.getCompositeCell(2, 2)).toBe("┏");
+    expect(state.getCompositeCell(11, 4)).toBe("┛");
+  });
+
   test("clearSelection deselects the active object", () => {
     const state = new DrawState(30, 12);
     state.setMode("box");

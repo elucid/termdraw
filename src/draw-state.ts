@@ -15,7 +15,7 @@ export const INK_COLORS = [
 const MAX_HISTORY = 100;
 const HANDLE_CHARACTER = "●";
 
-export type DrawMode = "box" | "line" | "paint" | "text";
+export type DrawMode = "select" | "box" | "line" | "paint" | "text";
 export type BoxStyle = (typeof BOX_STYLES)[number];
 export type InkColor = (typeof INK_COLORS)[number];
 type CanvasGrid = string[][];
@@ -78,6 +78,7 @@ export type DrawObject = BoxObject | LineObject | PaintObject | TextObject;
 
 type Snapshot = {
   objects: DrawObject[];
+  selectedObjectIds: string[];
   selectedObjectId: string | null;
   cursorX: number;
   cursorY: number;
@@ -85,6 +86,7 @@ type Snapshot = {
   nextZIndex: number;
 };
 
+type PendingSelection = { start: Point; end: Point };
 type PendingBox = { start: Point; end: Point };
 type PendingLine = { start: Point; end: Point };
 type PendingPaint = { points: Point[]; lastPoint: Point };
@@ -534,6 +536,10 @@ function rectContainsRect(outer: Rect, inner: Rect): boolean {
   );
 }
 
+function rectsIntersect(a: Rect, b: Rect): boolean {
+  return a.left <= b.right && a.right >= b.left && a.top <= b.bottom && a.bottom >= b.top;
+}
+
 function getRectArea(rect: Rect): number {
   return Math.max(0, rect.right - rect.left + 1) * Math.max(0, rect.bottom - rect.top + 1);
 }
@@ -565,6 +571,10 @@ function getTextSelectionBounds(object: TextObject): Rect {
     right: object.x + width,
     bottom: object.y + 1,
   };
+}
+
+function getObjectSelectionBounds(object: DrawObject): Rect {
+  return object.type === "text" ? getTextSelectionBounds(object) : getObjectBounds(object);
 }
 
 function getBoxCornerPoints(box: BoxObject): Record<BoxResizeHandle, Point> {
@@ -690,9 +700,11 @@ export class DrawState {
   private inkColorIndex = 0;
 
   private objects: DrawObject[] = [];
+  private selectedObjectIds: string[] = [];
   private selectedObjectId: string | null = null;
   private activeTextObjectId: string | null = null;
 
+  private pendingSelection: PendingSelection | null = null;
   private pendingLine: PendingLine | null = null;
   private pendingBox: PendingBox | null = null;
   private pendingPaint: PendingPaint | null = null;
@@ -762,7 +774,7 @@ export class DrawState {
   }
 
   public get hasSelectedObject(): boolean {
-    return this.getSelectedObject() !== null;
+    return this.selectedObjectIds.length > 0;
   }
 
   public get isEditingText(): boolean {
@@ -771,6 +783,7 @@ export class DrawState {
 
   public get hasActivePointerInteraction(): boolean {
     return (
+      this.pendingSelection !== null ||
       this.pendingLine !== null ||
       this.pendingBox !== null ||
       this.pendingPaint !== null ||
@@ -806,6 +819,7 @@ export class DrawState {
     this.cursorY = Math.max(0, Math.min(this.cursorY, this.canvasHeight - 1));
 
     this.setObjects(this.objects.map((object) => this.shiftObjectInsideCanvas(object)));
+    this.pendingSelection = null;
     this.pendingLine = null;
     this.pendingBox = null;
     this.pendingPaint = null;
@@ -847,6 +861,14 @@ export class DrawState {
         return;
       }
 
+      if (this.pendingSelection) {
+        this.pendingSelection.end = point;
+        this.setStatus(
+          `Selecting ${this.describeRect(normalizeRect(this.pendingSelection.start, this.pendingSelection.end))}.`,
+        );
+        return;
+      }
+
       if (this.pendingBox) {
         this.pendingBox.end = point;
         this.setStatus(
@@ -884,7 +906,7 @@ export class DrawState {
 
     if (!insideCanvas) {
       if (event.button === MouseButton.LEFT) {
-        this.selectedObjectId = null;
+        this.setSelectedObjects([]);
         this.activeTextObjectId = null;
         this.setStatus("Selection cleared.");
       }
@@ -905,8 +927,18 @@ export class DrawState {
     }
 
     switch (this.mode) {
+      case "select":
+        this.activeTextObjectId = null;
+        this.pendingSelection = {
+          start: { x: canvasX, y: canvasY },
+          end: { x: canvasX, y: canvasY },
+        };
+        this.setStatus(
+          `Selection start at ${canvasX + 1},${canvasY + 1}. Drag to select multiple objects.`,
+        );
+        return;
       case "box":
-        this.selectedObjectId = null;
+        this.setSelectedObjects([]);
         this.activeTextObjectId = null;
         this.pendingBox = {
           start: { x: canvasX, y: canvasY },
@@ -917,7 +949,7 @@ export class DrawState {
         );
         return;
       case "line":
-        this.selectedObjectId = null;
+        this.setSelectedObjects([]);
         this.activeTextObjectId = null;
         this.pendingLine = {
           start: { x: canvasX, y: canvasY },
@@ -928,7 +960,7 @@ export class DrawState {
         );
         return;
       case "paint":
-        this.selectedObjectId = null;
+        this.setSelectedObjects([]);
         this.activeTextObjectId = null;
         this.pendingPaint = {
           points: [{ x: canvasX, y: canvasY }],
@@ -944,6 +976,8 @@ export class DrawState {
 
   public getModeLabel(): string {
     switch (this.mode) {
+      case "select":
+        return "SELECT";
       case "line":
         return "LINE";
       case "box":
@@ -963,27 +997,42 @@ export class DrawState {
   }
 
   public getSelectedCellKeys(): Set<string> {
-    const selected = this.getSelectedObject();
     const keys = new Set<string>();
-    if (!selected) return keys;
 
-    for (const point of getObjectRenderCells(selected)) {
-      if (!this.isInsideCanvas(point.x, point.y)) continue;
-      keys.add(`${point.x},${point.y}`);
-    }
-
-    if (selected.type === "text") {
-      for (const point of getRectPerimeterPoints(getTextSelectionBounds(selected))) {
+    for (const selected of this.getSelectedObjects()) {
+      for (const point of getObjectRenderCells(selected)) {
         if (!this.isInsideCanvas(point.x, point.y)) continue;
         keys.add(`${point.x},${point.y}`);
+      }
+
+      if (selected.type === "text") {
+        for (const point of getRectPerimeterPoints(getTextSelectionBounds(selected))) {
+          if (!this.isInsideCanvas(point.x, point.y)) continue;
+          keys.add(`${point.x},${point.y}`);
+        }
       }
     }
 
     return keys;
   }
 
+  public getSelectionMarqueeCharacters(): Map<string, string> {
+    const marquee = new Map<string, string>();
+    if (!this.pendingSelection) return marquee;
+
+    const rect = normalizeRect(this.pendingSelection.start, this.pendingSelection.end);
+    for (const point of getRectPerimeterPoints(rect)) {
+      if (!this.isInsideCanvas(point.x, point.y)) continue;
+      marquee.set(`${point.x},${point.y}`, "·");
+    }
+
+    return marquee;
+  }
+
   public getSelectionHandleCharacters(): Map<string, string> {
     const handles = new Map<string, string>();
+
+    if (this.selectedObjectIds.length !== 1) return handles;
 
     const selected = this.getSelectedObject();
     if (!selected) return handles;
@@ -1007,8 +1056,8 @@ export class DrawState {
   }
 
   public clearSelection(): boolean {
-    const hadSelection = this.selectedObjectId !== null || this.activeTextObjectId !== null;
-    this.selectedObjectId = null;
+    const hadSelection = this.selectedObjectIds.length > 0 || this.activeTextObjectId !== null;
+    this.setSelectedObjects([]);
     this.activeTextObjectId = null;
     this.setStatus(hadSelection ? "Selection cleared." : "Nothing selected.");
     return hadSelection;
@@ -1043,25 +1092,31 @@ export class DrawState {
   }
 
   public moveSelectedObjectBy(dx: number, dy: number): void {
-    const selected = this.getSelectedObject();
-    if (!selected) {
+    const selected = this.getSelectedObjects();
+    if (selected.length === 0) {
       this.setStatus("No object selected.");
       return;
     }
 
-    const tree = this.getObjectTree(selected.id);
-    const movedTree = this.translateObjectTreeWithinCanvas(tree, dx, dy);
-    const moved = movedTree.find((object) => object.id === selected.id)!;
-    if (this.objectListsEqual(movedTree, tree)) {
-      this.setStatus(`${this.describeObject(selected)} is already at the edge.`);
+    const selectedTree = this.getSelectedObjectTrees();
+    const movedTree = this.translateObjectTreeWithinCanvas(selectedTree, dx, dy);
+    if (this.objectListsEqual(movedTree, selectedTree)) {
+      this.setStatus(
+        selected.length === 1
+          ? `${this.describeObject(selected[0]!)} is already at the edge.`
+          : "Selection is already at the edge.",
+      );
       return;
     }
 
     this.pushUndo();
     this.replaceObjects(movedTree);
-    this.selectedObjectId = moved.id;
     this.activeTextObjectId = null;
-    this.setStatus(`Moved ${this.describeObject(moved)}.`);
+    this.setStatus(
+      selected.length === 1
+        ? `Moved ${this.describeObject(selected[0]!)}.`
+        : `Moved ${selected.length} objects.`,
+    );
   }
 
   public setBrush(char: string): void {
@@ -1082,20 +1137,20 @@ export class DrawState {
     const idx = INK_COLORS.indexOf(color);
     this.inkColorIndex = idx >= 0 ? idx : 0;
 
-    const selected = this.getSelectedObject();
-    if (!selected || selected.color === color) {
+    const selected = this.getSelectedObjects();
+    const recolorable = selected.filter((object) => object.color !== color);
+    if (recolorable.length === 0) {
       this.setStatus(`Color set to ${this.describeInkColor(color)}.`);
       return;
     }
 
     this.pushUndo();
-    const recolored: DrawObject = {
-      ...selected,
-      color,
-    };
-    this.replaceObject(recolored);
-    this.selectedObjectId = recolored.id;
-    this.setStatus(`Applied ${this.describeInkColor(color)} to ${this.describeObject(recolored)}.`);
+    this.replaceObjects(recolorable.map((object) => ({ ...object, color })));
+    this.setStatus(
+      recolorable.length === 1
+        ? `Applied ${this.describeInkColor(color)} to ${this.describeObject(recolorable[0]!)}.`
+        : `Applied ${this.describeInkColor(color)} to ${recolorable.length} objects.`,
+    );
   }
 
   public cycleInkColor(direction: 1 | -1): void {
@@ -1118,7 +1173,7 @@ export class DrawState {
   }
 
   public cycleMode(): void {
-    const order: DrawMode[] = ["box", "line", "paint", "text"];
+    const order: DrawMode[] = ["select", "box", "line", "paint", "text"];
     const currentIndex = order.indexOf(this.mode);
     const next = order[(currentIndex + 1) % order.length] ?? "line";
     this.setMode(next);
@@ -1127,6 +1182,7 @@ export class DrawState {
   public setMode(next: DrawMode): void {
     if (this.mode === next) return;
     this.mode = next;
+    this.pendingSelection = null;
     this.pendingLine = null;
     this.pendingBox = null;
     this.pendingPaint = null;
@@ -1136,7 +1192,11 @@ export class DrawState {
       this.activeTextObjectId = null;
     }
 
-    if (next === "line") {
+    if (next === "select") {
+      this.setStatus(
+        "Select mode: click objects to select them, drag selected objects to move them, or drag empty space to marquee-select multiple objects.",
+      );
+    } else if (next === "line") {
       this.setStatus(
         "Line mode: drag on empty space to create a line. Click objects to move them, or line endpoints to adjust.",
       );
@@ -1169,7 +1229,7 @@ export class DrawState {
         brush: this.brush,
       };
       this.setObjects([...this.objects, object]);
-      this.selectedObjectId = object.id;
+      this.setSelectedObjects([object.id], object.id);
       this.activeTextObjectId = null;
       this.setStatus(`Painted "${this.brush}" at ${this.cursorX + 1},${this.cursorY + 1}.`);
       return;
@@ -1188,7 +1248,7 @@ export class DrawState {
       brush: this.brush,
     };
     this.setObjects([...this.objects, object]);
-    this.selectedObjectId = object.id;
+    this.setSelectedObjects([object.id], object.id);
     this.activeTextObjectId = null;
     this.setStatus(`Stamped "${this.brush}" at ${this.cursorX + 1},${this.cursorY + 1}.`);
   }
@@ -1209,7 +1269,7 @@ export class DrawState {
         content: activeObject.content + char,
       };
       this.replaceObject(updated);
-      this.selectedObjectId = updated.id;
+      this.setSelectedObjects([updated.id], updated.id);
       this.activeTextObjectId = updated.id;
       this.cursorX = Math.min(this.canvasWidth - 1, updated.x + visibleCellCount(updated.content));
       this.cursorY = updated.y;
@@ -1228,7 +1288,7 @@ export class DrawState {
       content: char,
     };
     this.setObjects([...this.objects, object]);
-    this.selectedObjectId = object.id;
+    this.setSelectedObjects([object.id], object.id);
     this.activeTextObjectId = object.id;
     this.cursorX = Math.min(this.canvasWidth - 1, this.cursorX + 1);
     this.setStatus(`Created ${this.describeObject(this.getObjectById(object.id) ?? object)}.`);
@@ -1248,7 +1308,7 @@ export class DrawState {
 
     if (parts.length === 0) {
       this.removeObjectById(activeObject.id);
-      this.selectedObjectId = null;
+      this.setSelectedObjects([]);
       this.activeTextObjectId = null;
       this.cursorX = activeObject.x;
       this.cursorY = activeObject.y;
@@ -1261,7 +1321,7 @@ export class DrawState {
       content: parts.join(""),
     };
     this.replaceObject(updated);
-    this.selectedObjectId = updated.id;
+    this.setSelectedObjects([updated.id], updated.id);
     this.activeTextObjectId = updated.id;
     this.cursorX = Math.min(this.canvasWidth - 1, updated.x + visibleCellCount(updated.content));
     this.cursorY = updated.y;
@@ -1275,16 +1335,19 @@ export class DrawState {
   }
 
   public deleteSelectedObject(): boolean {
-    const selected = this.getSelectedObject();
-    if (!selected) return false;
+    const selected = this.getSelectedObjects();
+    if (selected.length === 0) return false;
 
     this.pushUndo();
-    this.removeObjectById(selected.id);
-    this.selectedObjectId = null;
-    if (this.activeTextObjectId === selected.id) {
-      this.activeTextObjectId = null;
-    }
-    this.setStatus(`Deleted ${this.describeObject(selected)}.`);
+    const selectedIds = new Set(selected.map((object) => object.id));
+    this.setObjects(this.objects.filter((object) => !selectedIds.has(object.id)));
+    this.setSelectedObjects([]);
+    this.activeTextObjectId = null;
+    this.setStatus(
+      selected.length === 1
+        ? `Deleted ${this.describeObject(selected[0]!)}.`
+        : `Deleted ${selected.length} objects.`,
+    );
     return true;
   }
 
@@ -1296,8 +1359,9 @@ export class DrawState {
 
     this.pushUndo();
     this.setObjects([]);
-    this.selectedObjectId = null;
+    this.setSelectedObjects([]);
     this.activeTextObjectId = null;
+    this.pendingSelection = null;
     this.pendingLine = null;
     this.pendingBox = null;
     this.pendingPaint = null;
@@ -1367,7 +1431,7 @@ export class DrawState {
 
     const handleHit = this.findTopmostHandleAt(x, y);
     if (handleHit) {
-      this.selectedObjectId = handleHit.object.id;
+      this.setSelectedObjects([handleHit.object.id], handleHit.object.id);
       if (handleHit.kind === "box-corner") {
         this.dragState = {
           kind: "resize-box",
@@ -1403,7 +1467,6 @@ export class DrawState {
       hit.object,
       x,
       y,
-      `Selected ${this.describeObject(hit.object)}. Drag to move it.`,
       this.mode === "text" && hit.object.type === "text" && hit.onTextContent,
     );
     return true;
@@ -1413,29 +1476,40 @@ export class DrawState {
     object: DrawObject,
     x: number,
     y: number,
-    status: string,
     textEditOnClick: boolean,
   ): void {
-    this.selectedObjectId = object.id;
+    const selectionIds =
+      this.isObjectSelected(object.id) && this.selectedObjectIds.length > 0
+        ? this.selectedObjectIds
+        : [object.id];
+    const moveSelection = this.getMoveSelectionForObject(object);
+    const movingMultiple = selectionIds.length > 1;
+
+    this.setSelectedObjects(selectionIds, object.id);
     this.activeTextObjectId = null;
     this.dragState = {
       kind: "move",
       objectId: object.id,
       startMouse: { x, y },
-      originalObjects: cloneObjects(this.getObjectTree(object.id)),
+      originalObjects: cloneObjects(moveSelection),
       pushedUndo: false,
-      textEditOnClick,
+      textEditOnClick: textEditOnClick && selectionIds.length === 1,
     };
-    this.setStatus(status);
+    this.setStatus(
+      movingMultiple
+        ? `Selected ${selectionIds.length} objects. Drag to move them.`
+        : `Selected ${this.describeObject(object)}. Drag to move it.`,
+    );
   }
 
   private placeTextCursor(x: number, y: number): void {
-    this.selectedObjectId = null;
+    this.setSelectedObjects([]);
     this.activeTextObjectId = null;
     this.setStatus(`Text cursor ${x + 1},${y + 1}.`);
   }
 
   private beginEraseSession(): void {
+    this.pendingSelection = null;
     this.pendingLine = null;
     this.pendingBox = null;
     this.pendingPaint = null;
@@ -1448,6 +1522,32 @@ export class DrawState {
   }
 
   private finishPointerInteraction(point: Point, insideCanvas: boolean): void {
+    if (this.pendingSelection) {
+      const rect = normalizeRect(this.pendingSelection.start, this.pendingSelection.end);
+      this.pendingSelection = null;
+
+      if (rect.left === rect.right && rect.top === rect.bottom) {
+        this.setSelectedObjects([]);
+        this.setStatus(`Selection cleared at ${rect.left + 1},${rect.top + 1}.`);
+        return;
+      }
+
+      const selected = this.getObjectsWithinSelectionRect(rect);
+      this.setSelectedObjects(
+        selected.map((object) => object.id),
+        selected.at(-1)?.id ?? null,
+      );
+      this.activeTextObjectId = null;
+      this.setStatus(
+        selected.length === 0
+          ? `No objects in ${this.describeRect(rect)}.`
+          : selected.length === 1
+            ? `Selected ${this.describeObject(selected[0]!)}.`
+            : `Selected ${selected.length} objects.`,
+      );
+      return;
+    }
+
     if (this.pendingBox) {
       const rect = normalizeRect(this.pendingBox.start, this.pendingBox.end);
       this.pendingBox = null;
@@ -1470,7 +1570,7 @@ export class DrawState {
         style: this.boxStyle,
       };
       this.setObjects([...this.objects, object]);
-      this.selectedObjectId = object.id;
+      this.setSelectedObjects([object.id], object.id);
       this.setStatus(`Created ${this.describeObject(this.getObjectById(object.id) ?? object)}.`);
       return;
     }
@@ -1499,7 +1599,7 @@ export class DrawState {
         brush: this.brush,
       };
       this.setObjects([...this.objects, object]);
-      this.selectedObjectId = object.id;
+      this.setSelectedObjects([object.id], object.id);
       this.setStatus(`Created ${this.describeObject(this.getObjectById(object.id) ?? object)}.`);
       return;
     }
@@ -1519,7 +1619,7 @@ export class DrawState {
         brush: this.brush,
       };
       this.setObjects([...this.objects, object]);
-      this.selectedObjectId = object.id;
+      this.setSelectedObjects([object.id], object.id);
       this.setStatus(`Created ${this.describeObject(this.getObjectById(object.id) ?? object)}.`);
       return;
     }
@@ -1531,7 +1631,7 @@ export class DrawState {
 
       if (!dragState.pushedUndo) {
         if (dragState.kind === "move" && dragState.textEditOnClick && object?.type === "text") {
-          this.selectedObjectId = object.id;
+          this.setSelectedObjects([object.id], object.id);
           this.activeTextObjectId = object.id;
           this.cursorX = Math.min(
             this.canvasWidth - 1,
@@ -1543,7 +1643,11 @@ export class DrawState {
         }
 
         if (object) {
-          this.setStatus(`Selected ${this.describeObject(object)}.`);
+          this.setStatus(
+            dragState.kind === "move" && this.selectedObjectIds.length > 1
+              ? `Selected ${this.selectedObjectIds.length} objects.`
+              : `Selected ${this.describeObject(object)}.`,
+          );
         }
         return;
       }
@@ -1553,6 +1657,8 @@ export class DrawState {
           this.setStatus(`Resized ${this.describeObject(object)}.`);
         } else if (dragState.kind === "line-endpoint") {
           this.setStatus(`Adjusted ${this.describeObject(object)}.`);
+        } else if (this.selectedObjectIds.length > 1) {
+          this.setStatus(`Moved ${this.selectedObjectIds.length} objects.`);
         } else {
           this.setStatus(`Moved ${this.describeObject(object)}.`);
         }
@@ -1618,13 +1724,15 @@ export class DrawState {
     }
 
     this.replaceObjects(nextObjects);
-    this.selectedObjectId = nextObject.id;
+    this.setSelectedObjects(this.selectedObjectIds, nextObject.id);
     this.activeTextObjectId = null;
 
     if (dragState.kind === "resize-box") {
       this.setStatus(`Resizing ${this.describeObject(nextObject)}.`);
     } else if (dragState.kind === "line-endpoint") {
       this.setStatus(`Adjusting ${this.describeObject(nextObject)}.`);
+    } else if (this.selectedObjectIds.length > 1) {
+      this.setStatus(`Moving ${this.selectedObjectIds.length} objects.`);
     } else {
       this.setStatus(`Moving ${this.describeObject(nextObject)}.`);
     }
@@ -1673,8 +1781,8 @@ export class DrawState {
 
     this.eraseState.erasedIds.add(hit.id);
     this.removeObjectById(hit.id);
-    if (this.selectedObjectId === hit.id) {
-      this.selectedObjectId = null;
+    if (this.isObjectSelected(hit.id)) {
+      this.setSelectedObjects(this.selectedObjectIds.filter((id) => id !== hit.id));
     }
     if (this.activeTextObjectId === hit.id) {
       this.activeTextObjectId = null;
@@ -1688,7 +1796,7 @@ export class DrawState {
 
     this.pushUndo();
     this.removeObjectById(hit.id);
-    this.selectedObjectId = null;
+    this.setSelectedObjects([]);
     if (this.activeTextObjectId === hit.id) {
       this.activeTextObjectId = null;
     }
@@ -1699,6 +1807,7 @@ export class DrawState {
   private createSnapshot(): Snapshot {
     return {
       objects: cloneObjects(this.objects),
+      selectedObjectIds: [...this.selectedObjectIds],
       selectedObjectId: this.selectedObjectId,
       cursorX: this.cursorX,
       cursorY: this.cursorY,
@@ -1719,12 +1828,15 @@ export class DrawState {
     this.objects = this.recomputeParentAssignments(
       cloneObjects(snapshot.objects).map((object) => this.shiftObjectInsideCanvas(object)),
     );
+    this.selectedObjectIds = [...snapshot.selectedObjectIds];
     this.selectedObjectId = snapshot.selectedObjectId;
+    this.syncSelection();
     this.cursorX = Math.max(0, Math.min(snapshot.cursorX, this.canvasWidth - 1));
     this.cursorY = Math.max(0, Math.min(snapshot.cursorY, this.canvasHeight - 1));
     this.nextObjectNumber = snapshot.nextObjectNumber;
     this.nextZIndex = snapshot.nextZIndex;
     this.activeTextObjectId = null;
+    this.pendingSelection = null;
     this.pendingLine = null;
     this.pendingBox = null;
     this.pendingPaint = null;
@@ -1917,9 +2029,61 @@ export class DrawState {
     return this.objects.find((object) => object.id === id) ?? null;
   }
 
+  private isObjectSelected(id: string): boolean {
+    return this.selectedObjectIds.includes(id) || this.selectedObjectId === id;
+  }
+
   private getSelectedObject(): DrawObject | null {
     if (!this.selectedObjectId) return null;
     return this.getObjectById(this.selectedObjectId);
+  }
+
+  private getSelectedObjects(): DrawObject[] {
+    const ids =
+      this.selectedObjectIds.length > 0
+        ? this.selectedObjectIds
+        : this.selectedObjectId
+          ? [this.selectedObjectId]
+          : [];
+
+    return ids
+      .map((id) => this.getObjectById(id))
+      .filter((object): object is DrawObject => object !== null);
+  }
+
+  private getSelectedRootObjects(): DrawObject[] {
+    const selectedIds = new Set(this.selectedObjectIds);
+
+    return this.getSelectedObjects().filter((object) => {
+      let parentId = object.parentId;
+      while (parentId) {
+        if (selectedIds.has(parentId)) {
+          return false;
+        }
+        parentId = this.getObjectById(parentId)?.parentId ?? null;
+      }
+      return true;
+    });
+  }
+
+  private getSelectedObjectTrees(): DrawObject[] {
+    const treeIds = new Set<string>();
+
+    for (const object of this.getSelectedRootObjects()) {
+      for (const treeObject of this.getObjectTree(object.id)) {
+        treeIds.add(treeObject.id);
+      }
+    }
+
+    return this.objects.filter((object) => treeIds.has(object.id));
+  }
+
+  private getMoveSelectionForObject(object: DrawObject): DrawObject[] {
+    if (!this.isObjectSelected(object.id) || this.selectedObjectIds.length <= 1) {
+      return this.getObjectTree(object.id);
+    }
+
+    return this.getSelectedObjectTrees();
   }
 
   private getActiveTextObject(): TextObject | null {
@@ -1968,6 +2132,7 @@ export class DrawState {
 
   private setObjects(nextObjects: DrawObject[]): void {
     this.objects = this.recomputeParentAssignments(nextObjects);
+    this.syncSelection();
     this.markSceneDirty();
   }
 
@@ -1982,6 +2147,50 @@ export class DrawState {
 
   private removeObjectById(id: string): void {
     this.setObjects(this.objects.filter((object) => object.id !== id));
+  }
+
+  private setSelectedObjects(ids: string[], primaryId: string | null = ids.at(-1) ?? null): void {
+    const existingIds = new Set(this.objects.map((object) => object.id));
+    const nextIds = [...new Set(ids)].filter((id) => existingIds.has(id));
+
+    this.selectedObjectIds = nextIds;
+    this.selectedObjectId =
+      primaryId && nextIds.includes(primaryId) ? primaryId : (nextIds.at(-1) ?? null);
+
+    if (
+      this.activeTextObjectId !== null &&
+      (nextIds.length !== 1 || this.activeTextObjectId !== this.selectedObjectId)
+    ) {
+      this.activeTextObjectId = null;
+    }
+  }
+
+  private syncSelection(): void {
+    const existingIds = new Set(this.objects.map((object) => object.id));
+    this.selectedObjectIds = this.selectedObjectIds.filter((id) => existingIds.has(id));
+
+    if (this.selectedObjectId && !existingIds.has(this.selectedObjectId)) {
+      this.selectedObjectId = null;
+    }
+
+    if (this.selectedObjectId && !this.selectedObjectIds.includes(this.selectedObjectId)) {
+      this.selectedObjectIds.push(this.selectedObjectId);
+    }
+
+    if (this.selectedObjectIds.length === 0) {
+      this.selectedObjectId = null;
+    } else if (!this.selectedObjectId) {
+      this.selectedObjectId = this.selectedObjectIds.at(-1) ?? null;
+    }
+
+    if (
+      this.activeTextObjectId !== null &&
+      (!existingIds.has(this.activeTextObjectId) ||
+        this.selectedObjectIds.length !== 1 ||
+        this.activeTextObjectId !== this.selectedObjectId)
+    ) {
+      this.activeTextObjectId = null;
+    }
   }
 
   private findTopmostHandleAt(x: number, y: number): HandleHit | null {
@@ -2043,6 +2252,10 @@ export class DrawState {
     }
 
     return null;
+  }
+
+  private getObjectsWithinSelectionRect(rect: Rect): DrawObject[] {
+    return this.objects.filter((object) => rectsIntersect(getObjectSelectionBounds(object), rect));
   }
 
   private translateObjectWithinCanvas(

@@ -27,7 +27,7 @@ test("TermDrawApp renders the full chrome and can save", async () => {
     />,
     {
       width: 64,
-      height: 26,
+      height: 29,
       useMouse: true,
       enableMouseMovement: true,
     },
@@ -83,7 +83,7 @@ test("TermDraw remains an alias for the full app component", async () => {
     <TermDraw width="100%" height="100%" autoFocus showStartupLogo={false} />,
     {
       width: 64,
-      height: 26,
+      height: 29,
       useMouse: true,
       enableMouseMovement: true,
     },
