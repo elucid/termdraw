@@ -20,7 +20,7 @@ import {
   type DrawMode,
   type InkColor,
   type PointerEventLike,
-} from "./draw-state";
+} from "./draw-state.js";
 
 const MIN_WIDTH = 45;
 const MIN_HEIGHT = 24;

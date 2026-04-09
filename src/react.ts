@@ -1,6 +1,6 @@
 import React from "react";
 import { extend, type ExtendedComponentProps } from "@opentui/react";
-import { TermDrawAppRenderable, TermDrawEditorRenderable } from "./app";
+import { TermDrawAppRenderable, TermDrawEditorRenderable } from "./app.js";
 
 export const TERM_DRAW_COMPONENT_NAME = "term-draw";
 export const TERM_DRAW_APP_COMPONENT_NAME = "term-draw-app";

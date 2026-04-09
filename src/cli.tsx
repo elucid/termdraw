@@ -1,7 +1,9 @@
+#!/usr/bin/env bun
+
 import { createCliRenderer } from "@opentui/core";
 import { createRoot } from "@opentui/react";
-import { buildHelpText, formatSavedOutput } from "./app";
-import { TermDrawApp } from "./react";
+import { buildHelpText, formatSavedOutput } from "./app.js";
+import { TermDrawApp } from "./react.js";
 
 interface CliOptions {
   outputPath?: string;

@@ -16,6 +16,14 @@ Requirements:
 - [Bun](https://bun.sh)
 - A terminal with mouse support
 
+From npm:
+
+```bash
+bun add @benvinegar/termdraw
+```
+
+Or from source:
+
 ```bash
 git clone https://github.com/benvinegar/termdraw.git
 cd termdraw
@@ -24,10 +32,16 @@ bun install
 
 ## Quick start
 
-Start the app:
+Start the app from a local checkout:
 
 ```bash
 bun run start
+```
+
+Or run the published CLI:
+
+```bash
+bunx @benvinegar/termdraw
 ```
 
 Draw something, then press `Enter` or `Ctrl+S` to save. By default, termDRAW! writes the result to stdout after the app exits.
@@ -91,7 +105,7 @@ Full chrome:
 ```tsx
 import { createCliRenderer } from "@opentui/core";
 import { createRoot } from "@opentui/react";
-import { TermDrawApp } from "termdraw";
+import { TermDrawApp } from "@benvinegar/termdraw";
 
 const renderer = await createCliRenderer({
   useMouse: true,
@@ -118,7 +132,7 @@ createRoot(renderer).render(
 Bare editor surface:
 
 ```tsx
-import { TermDrawEditor } from "termdraw";
+import { TermDrawEditor } from "@benvinegar/termdraw";
 
 <TermDrawEditor width="100%" height="100%" autoFocus onSave={(art) => console.log(art)} />;
 ```
@@ -148,6 +162,10 @@ Before opening a PR:
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
+## Publishing note
+
+The unscoped `termdraw` package name is already taken on npm, so this package is configured to publish as `@benvinegar/termdraw`.
 
 ## Support
 

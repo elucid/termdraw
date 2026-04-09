@@ -4,21 +4,22 @@
   "workspaces": {
     "": {
       "name": "termdraw",
-      "dependencies": {
+      "devDependencies": {
         "@opentui/core": "^0.1.97",
         "@opentui/react": "^0.1.97",
-        "react": "^19.2.5",
-      },
-      "devDependencies": {
         "@types/bun": "latest",
         "@types/react": "^19.2.14",
         "lint-staged": "^16.4.0",
         "oxfmt": "^0.44.0",
         "oxlint": "^1.59.0",
+        "react": "^19.2.5",
         "simple-git-hooks": "^2.13.1",
+        "typescript": "^5.9.3",
       },
       "peerDependencies": {
-        "typescript": "^5",
+        "@opentui/core": "^0.1.97",
+        "@opentui/react": "^0.1.97",
+        "react": "^19.0.0",
       },
     },
   },
