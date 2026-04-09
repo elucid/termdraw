@@ -147,6 +147,23 @@ describe("DrawState", () => {
     expect(state.getCompositeCell(5, 3)).toBe("i");
   });
 
+  test("text objects keep spaces inside the same virtual textbox", () => {
+    const state = new DrawState(30, 14);
+    state.setMode("text");
+
+    const start = canvasPoint(state, 2, 2);
+    state.handlePointerEvent({ type: "down", button: MouseButton.LEFT, ...start });
+    state.insertCharacter("H");
+    state.insertCharacter(" ");
+    state.insertCharacter("i");
+
+    const selected = state.getSelectedCellKeys();
+    expect(selected.has("2,2")).toBe(true);
+    expect(selected.has("3,2")).toBe(true);
+    expect(selected.has("4,2")).toBe(true);
+    expect(state.exportArt()).toBe("  H i");
+  });
+
   test("text mode click still edits text while drag moves it", () => {
     const state = new DrawState(30, 12);
     state.setMode("text");

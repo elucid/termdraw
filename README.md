@@ -50,7 +50,7 @@ bun run start
 - `Ctrl+X`: clear
 - `[` / `]`: cycle brush in line mode
 - `Arrow keys`: move cursor, or nudge the selected object when one is selected
-- `Space`: stamp brush in line mode
+- `Space`: stamp brush in line mode, or insert a space in text mode
 - `Delete`: remove the selected object
 - `Enter` or `Ctrl+S`: save
 - `Esc`: deselect

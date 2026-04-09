@@ -383,6 +383,13 @@ export class OpenTuiDrawApp extends FrameBufferRenderable {
         return;
       }
 
+      if (name === "space") {
+        key.preventDefault();
+        this.state.insertCharacter(" ");
+        this.requestRender();
+        return;
+      }
+
       if (isPrintableKey(key)) {
         key.preventDefault();
         this.state.insertCharacter(key.raw);
@@ -765,6 +772,7 @@ export function buildHelpText(binaryName = "termdraw"): string {
       `  Ctrl+Z / Ctrl+Y undo / redo\n` +
       `  Ctrl+X          clear canvas\n` +
       `  [ / ]           cycle brush in line mode\n` +
+      `  Space           stamp brush in line mode / insert space in text mode\n` +
       `  Enter / Ctrl+S  save\n\n` +
       `Options:\n` +
       `  -o, --output <file>  write the result to a file\n` +
