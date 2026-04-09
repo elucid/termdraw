@@ -171,7 +171,11 @@ export class OpenTuiDrawApp extends FrameBufferRenderable {
       return;
     }
 
-    if (this.state.currentMode === "select" && (name === "backspace" || name === "delete")) {
+    if (
+      !this.state.isEditingText &&
+      this.state.hasSelectedObject &&
+      (name === "backspace" || name === "delete")
+    ) {
       key.preventDefault();
       this.state.deleteSelectedObject();
       this.requestRender();
@@ -180,7 +184,7 @@ export class OpenTuiDrawApp extends FrameBufferRenderable {
 
     if (name === "up") {
       key.preventDefault();
-      if (this.state.currentMode === "select" && this.state.hasSelectedObject) {
+      if (this.state.hasSelectedObject && !this.state.isEditingText) {
         this.state.moveSelectedObjectBy(0, -1);
       } else {
         this.state.moveCursor(0, -1);
@@ -191,7 +195,7 @@ export class OpenTuiDrawApp extends FrameBufferRenderable {
 
     if (name === "down") {
       key.preventDefault();
-      if (this.state.currentMode === "select" && this.state.hasSelectedObject) {
+      if (this.state.hasSelectedObject && !this.state.isEditingText) {
         this.state.moveSelectedObjectBy(0, 1);
       } else {
         this.state.moveCursor(0, 1);
@@ -202,7 +206,7 @@ export class OpenTuiDrawApp extends FrameBufferRenderable {
 
     if (name === "left") {
       key.preventDefault();
-      if (this.state.currentMode === "select" && this.state.hasSelectedObject) {
+      if (this.state.hasSelectedObject && !this.state.isEditingText) {
         this.state.moveSelectedObjectBy(-1, 0);
       } else {
         this.state.moveCursor(-1, 0);
@@ -213,7 +217,7 @@ export class OpenTuiDrawApp extends FrameBufferRenderable {
 
     if (name === "right") {
       key.preventDefault();
-      if (this.state.currentMode === "select" && this.state.hasSelectedObject) {
+      if (this.state.hasSelectedObject && !this.state.isEditingText) {
         this.state.moveSelectedObjectBy(1, 0);
       } else {
         this.state.moveCursor(1, 0);
@@ -340,9 +344,7 @@ export class OpenTuiDrawApp extends FrameBufferRenderable {
         ? COLORS.accent
         : this.state.currentMode === "box"
           ? COLORS.warning
-          : this.state.currentMode === "text"
-            ? COLORS.success
-            : COLORS.selectionBg;
+          : COLORS.success;
     x = drawSegment(
       this.frameBuffer,
       x,
@@ -366,7 +368,7 @@ export class OpenTuiDrawApp extends FrameBufferRenderable {
   private drawStatusRow(y: number, innerWidth: number): void {
     this.drawSideBorders(y);
     const text =
-      "Enter save • Esc cancel • select: move/resize/adjust • draw modes: drag existing objects to move • Delete removes selection • [ ] brush • right-drag delete";
+      "Enter save • Esc cancel • click objects to move • drag box corners / line endpoints to edit • selected text shows a virtual box • Delete removes selection";
     const combined = `${text}  ${this.state.currentStatus}`;
     const padded = padToWidth(combined, innerWidth);
     this.frameBuffer.drawText(padded, 1, y, COLORS.dim, COLORS.panel);
@@ -436,9 +438,10 @@ export function buildHelpText(binaryName = "tui-draw"): string {
   return truncateToCells(
     `${binaryName} [--output file] [--fenced|--plain]\n\n` +
       `Controls:\n` +
-      `  Ctrl+T / Tab   cycle select / box / line / text\n` +
-      `  select mode    move objects, resize box corners, drag line endpoints\n` +
-      `  draw modes     drag existing objects to move them\n` +
+      `  Ctrl+T / Tab   cycle box / line / text\n` +
+      `  click objects  select and move them\n` +
+      `  drag corners   resize boxes / adjust line endpoints\n` +
+      `  selected text  shows a virtual selection box\n` +
       `  Delete         remove selected object\n` +
       `  Ctrl+Z / Ctrl+Y undo / redo\n` +
       `  Ctrl+X         clear canvas\n` +
