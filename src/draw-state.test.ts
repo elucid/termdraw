@@ -175,6 +175,22 @@ describe("DrawState", () => {
     expect(state.getCompositeCell(4, 1)).toBe("!");
   });
 
+  test("clearSelection deselects the active object", () => {
+    const state = new DrawState(30, 12);
+    state.setMode("box");
+
+    const start = canvasPoint(state, 1, 1);
+    const end = canvasPoint(state, 4, 3);
+    state.handlePointerEvent({ type: "down", button: MouseButton.LEFT, ...start });
+    state.handlePointerEvent({ type: "drag", button: MouseButton.LEFT, ...end });
+    state.handlePointerEvent({ type: "up", button: MouseButton.LEFT, ...end });
+
+    expect(state.getSelectedCellKeys().size).toBeGreaterThan(0);
+    expect(state.clearSelection()).toBe(true);
+    expect(state.getSelectedCellKeys().size).toBe(0);
+    expect(state.getSelectionHandleCharacters().size).toBe(0);
+  });
+
   test("undo and redo restore moved objects", () => {
     const state = new DrawState(30, 12);
     state.setMode("box");

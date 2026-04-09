@@ -729,6 +729,14 @@ export class DrawState {
     return handles;
   }
 
+  public clearSelection(): boolean {
+    const hadSelection = this.selectedObjectId !== null || this.activeTextObjectId !== null;
+    this.selectedObjectId = null;
+    this.activeTextObjectId = null;
+    this.setStatus(hadSelection ? "Selection cleared." : "Nothing selected.");
+    return hadSelection;
+  }
+
   public getCompositeCell(x: number, y: number): string {
     this.ensureScene();
     const ink = this.renderCanvas[y]![x] ?? " ";

@@ -53,7 +53,8 @@ bun run start
 - `Space`: stamp brush in line mode
 - `Delete`: remove the selected object
 - `Enter` or `Ctrl+S`: save
-- `Esc` or `Ctrl+C`: cancel
+- `Esc`: deselect
+- `Ctrl+Q` or `Ctrl+C`: quit without saving
 - mouse left-drag on a selected box corner: resize the box
 - mouse left-drag on a selected line endpoint: adjust that endpoint
 - mouse left-drag on an existing object: move it

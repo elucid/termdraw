@@ -189,7 +189,7 @@ export class OpenTuiDrawApp extends FrameBufferRenderable {
   private handleKeyPressEvent(key: KeyEvent): void {
     const name = key.name.toLowerCase();
 
-    if (key.ctrl && name === "c") {
+    if ((key.ctrl && name === "c") || (key.ctrl && name === "q")) {
       key.preventDefault();
       this.onFinish(null);
       return;
@@ -197,7 +197,8 @@ export class OpenTuiDrawApp extends FrameBufferRenderable {
 
     if (name === "escape") {
       key.preventDefault();
-      this.onFinish(null);
+      this.state.clearSelection();
+      this.requestRender();
       return;
     }
 
@@ -539,7 +540,7 @@ export class OpenTuiDrawApp extends FrameBufferRenderable {
 
   private drawFooterRow(layout: AppLayout): void {
     const text =
-      "Right palette / Tab tool • click objects to move • drag box corners / line endpoints to edit • Del remove • Enter save";
+      "Right palette / Tab tool • click objects to move • drag box corners / line endpoints to edit • Esc deselect • Ctrl+Q quit";
     const combined = `${text}  ${this.state.currentStatus}`;
     const padded = padToWidth(combined, Math.max(1, this.width - 2));
     this.frameBuffer.drawText(padded, 1, layout.footerY, COLORS.dim, COLORS.panel);
@@ -671,11 +672,12 @@ export function buildHelpText(binaryName = "termdraw"): string {
       `  drag handles    resize boxes / adjust line endpoints\n` +
       `  selected text   shows a virtual selection box\n` +
       `  Delete          remove selected object\n` +
+      `  Esc             deselect\n` +
+      `  Ctrl+Q          quit\n` +
       `  Ctrl+Z / Ctrl+Y undo / redo\n` +
       `  Ctrl+X          clear canvas\n` +
       `  [ / ]           cycle brush in line mode\n` +
-      `  Enter / Ctrl+S  save\n` +
-      `  Esc / Ctrl+C    cancel\n\n` +
+      `  Enter / Ctrl+S  save\n\n` +
       `Options:\n` +
       `  -o, --output <file>  write the result to a file\n` +
       `  --fenced            output as a fenced markdown code block\n` +
