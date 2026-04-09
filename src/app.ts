@@ -42,6 +42,16 @@ const COLORS = {
   cursorBg: RGBA.fromHex("#f8fafc"),
 };
 
+const STARTUP_LOGO_LINES = [
+  "  `::                              :::::::-.  :::::::..    :::.  .::    .   .:::.:",
+  "   ;;                               ;;,   `';,;;;;``;;;;   ;;`;; ';;,  ;;  ;;;';;;",
+  "=[[[[[[.,cc[[[cc.=,,[[==[ccc, ,cccc,`[[     [[ [[[,/[[['  ,[[ '[[,'[[, [[, [[' '[[",
+  '   $$   $$$___--\'`$$$"``$$$$$$$$"$$$ $$,    $$ $$$$$$c   c$$$cc$$$c Y$c$$$c$P   $$',
+  '   88,  88b    ,o,888   888 Y88" 888o888_,o8P\' 888b "88bo,888   888  "88"888    ""',
+  '   MMM   "YUMMMMP""MM,  MMM  M\'  "MMMMMMP"`   MMMM   "W" YMM   ""` "M "M"    MM',
+] as const;
+const STARTUP_LOGO_CAPTION = "(c) 2026 Ben Vinegar  ·  Licensed under MIT";
+
 type AppLayout = {
   dividerX: number;
   paletteLeft: number;
@@ -84,6 +94,28 @@ function drawSegment(
   return x + visibleCellCount(text);
 }
 
+function mixColor(a: RGBA, b: RGBA, t: number): RGBA {
+  const [ar, ag, ab, aa] = a.toInts();
+  const [br, bg, bb, ba] = b.toInts();
+  const mix = (left: number, right: number) => Math.round(left + (right - left) * t);
+  return RGBA.fromInts(mix(ar, br), mix(ag, bg), mix(ab, bb), mix(aa, ba));
+}
+
+function getStartupLogoColor(rowIndex: number, colIndex: number, lineWidth: number): RGBA {
+  const verticalT = STARTUP_LOGO_LINES.length <= 1 ? 0 : rowIndex / (STARTUP_LOGO_LINES.length - 1);
+  const verticalColor =
+    verticalT <= 0.55
+      ? mixColor(COLORS.dim, COLORS.accent, verticalT / 0.55)
+      : mixColor(COLORS.accent, COLORS.warning, (verticalT - 0.55) / 0.45);
+  const horizontalT = lineWidth <= 1 ? 0 : colIndex / (lineWidth - 1);
+  const highlightStrength = 0.1 + 0.16 * Math.sin(horizontalT * Math.PI);
+  return mixColor(verticalColor, COLORS.text, highlightStrength);
+}
+
+function getStartupLogoCaptionColor(): RGBA {
+  return mixColor(COLORS.border, COLORS.text, 0.3);
+}
+
 function isInsideRect(
   x: number,
   y: number,
@@ -97,6 +129,7 @@ function isInsideRect(
 
 export class OpenTuiDrawApp extends FrameBufferRenderable {
   private readonly state: DrawState;
+  private showStartupLogo = true;
   private readonly handleKeyPressBound = (key: KeyEvent) => {
     this.handleKeyPressEvent(key);
   };
@@ -128,6 +161,10 @@ export class OpenTuiDrawApp extends FrameBufferRenderable {
     const layout = this.syncCanvasLayout();
     const x = event.x - this.x;
     const y = event.y - this.y;
+
+    if (event.type !== "move" && event.type !== "over" && event.type !== "out") {
+      this.dismissStartupLogo();
+    }
 
     if (!this.state.hasActivePointerInteraction) {
       const toolButton = this.getToolButtons(layout).find((button) =>
@@ -178,6 +215,7 @@ export class OpenTuiDrawApp extends FrameBufferRenderable {
     this.drawChrome(layout);
     this.drawToolPalette(layout);
     this.drawCanvas();
+    this.drawStartupLogo(layout);
     super.renderSelf(buffer);
   }
 
@@ -188,6 +226,8 @@ export class OpenTuiDrawApp extends FrameBufferRenderable {
 
   private handleKeyPressEvent(key: KeyEvent): void {
     const name = key.name.toLowerCase();
+
+    this.dismissStartupLogo();
 
     if ((key.ctrl && name === "c") || (key.ctrl && name === "q")) {
       key.preventDefault();
@@ -349,6 +389,10 @@ export class OpenTuiDrawApp extends FrameBufferRenderable {
         this.requestRender();
       }
     }
+  }
+
+  private dismissStartupLogo(): void {
+    this.showStartupLogo = false;
   }
 
   private syncCanvasLayout(): AppLayout {
@@ -639,6 +683,50 @@ export class OpenTuiDrawApp extends FrameBufferRenderable {
           isCursor || isSelected || isHandle ? TextAttributes.BOLD : TextAttributes.NONE;
         this.frameBuffer.setCell(x + this.state.canvasLeftCol, rowY, cell, fg, bg, attributes);
       }
+    }
+  }
+
+  private drawStartupLogo(layout: AppLayout): void {
+    if (!this.showStartupLogo) return;
+
+    const logoWidth = Math.max(...STARTUP_LOGO_LINES.map((line) => visibleCellCount(line)));
+    const logoHeight = STARTUP_LOGO_LINES.length;
+    const captionWidth = visibleCellCount(STARTUP_LOGO_CAPTION);
+    const availableWidth = layout.dividerX - this.state.canvasLeftCol;
+    const availableHeight = layout.bodyBottom - this.state.canvasTopRow + 1;
+    const showCaption = availableWidth >= captionWidth && availableHeight >= logoHeight + 2;
+    const overlayHeight = showCaption ? logoHeight + 2 : logoHeight;
+
+    if (availableWidth < logoWidth || availableHeight < overlayHeight) {
+      return;
+    }
+
+    const startY = this.state.canvasTopRow + Math.floor((availableHeight - overlayHeight) / 2);
+
+    for (const [rowIndex, line] of STARTUP_LOGO_LINES.entries()) {
+      const y = startY + rowIndex;
+      const lineWidth = visibleCellCount(line);
+      const startX = this.state.canvasLeftCol + Math.floor((availableWidth - lineWidth) / 2);
+      for (const [colIndex, char] of Array.from(line).entries()) {
+        if (char === " ") continue;
+        const x = startX + colIndex;
+        const fg = getStartupLogoColor(rowIndex, colIndex, line.length);
+        const attributes = rowIndex >= 2 ? TextAttributes.BOLD : TextAttributes.NONE;
+        this.frameBuffer.setCell(x, y, char, fg, COLORS.panel, attributes);
+      }
+    }
+
+    if (showCaption) {
+      const captionY = startY + logoHeight + 1;
+      const captionX = this.state.canvasLeftCol + Math.floor((availableWidth - captionWidth) / 2);
+      this.frameBuffer.drawText(
+        STARTUP_LOGO_CAPTION,
+        captionX,
+        captionY,
+        getStartupLogoCaptionColor(),
+        COLORS.panel,
+        TextAttributes.DIM,
+      );
     }
   }
 
