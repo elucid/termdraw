@@ -83,6 +83,17 @@ bun run index.ts -- --output diagram.txt
 ## Development
 
 ```bash
+bun run format
+bun run lint
 bun test
 bun run typecheck
 ```
+
+## Git hooks
+
+A pre-commit hook is installed via `simple-git-hooks` during `bun install`.
+
+It runs on staged files with:
+
+- `oxfmt --write`
+- `oxlint --fix --quiet`

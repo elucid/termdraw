@@ -8,7 +8,13 @@ import {
   type MouseEvent,
   type OptimizedBuffer,
 } from "@opentui/core";
-import { DrawState, padToWidth, truncateToCells, visibleCellCount, type PointerEventLike } from "./draw-state";
+import {
+  DrawState,
+  padToWidth,
+  truncateToCells,
+  visibleCellCount,
+  type PointerEventLike,
+} from "./draw-state";
 
 const MIN_WIDTH = 24;
 const MIN_HEIGHT = 7;
@@ -289,7 +295,14 @@ export class OpenTuiDrawApp extends FrameBufferRenderable {
     for (let index = 0; index < lines.length; index += 1) {
       const text = lines[index]!;
       const x = Math.max(0, Math.floor((width - visibleCellCount(text)) / 2));
-      this.frameBuffer.drawText(text, x, startY + index, COLORS.warning, COLORS.panel, TextAttributes.BOLD);
+      this.frameBuffer.drawText(
+        text,
+        x,
+        startY + index,
+        COLORS.warning,
+        COLORS.panel,
+        TextAttributes.BOLD,
+      );
     }
   }
 
@@ -310,7 +323,15 @@ export class OpenTuiDrawApp extends FrameBufferRenderable {
     this.frameBuffer.drawText(" ".repeat(innerWidth), 1, y, COLORS.text, COLORS.panel);
 
     let x = 1;
-    x = drawSegment(this.frameBuffer, x, y, "/draw", COLORS.accent, COLORS.panel, TextAttributes.BOLD);
+    x = drawSegment(
+      this.frameBuffer,
+      x,
+      y,
+      "/draw",
+      COLORS.accent,
+      COLORS.panel,
+      TextAttributes.BOLD,
+    );
     x = drawSegment(this.frameBuffer, x, y, "  mode:", COLORS.dim, COLORS.panel);
 
     const modeLabel = this.state.getModeLabel();
@@ -322,9 +343,24 @@ export class OpenTuiDrawApp extends FrameBufferRenderable {
           : this.state.currentMode === "text"
             ? COLORS.success
             : COLORS.selectionBg;
-    x = drawSegment(this.frameBuffer, x, y, modeLabel, modeColor, COLORS.panel, TextAttributes.BOLD);
+    x = drawSegment(
+      this.frameBuffer,
+      x,
+      y,
+      modeLabel,
+      modeColor,
+      COLORS.panel,
+      TextAttributes.BOLD,
+    );
     x = drawSegment(this.frameBuffer, x, y, "  brush:", COLORS.dim, COLORS.panel);
-    drawSegment(this.frameBuffer, x, y, `"${this.state.currentBrush}"`, COLORS.accent, COLORS.panel);
+    drawSegment(
+      this.frameBuffer,
+      x,
+      y,
+      `"${this.state.currentBrush}"`,
+      COLORS.accent,
+      COLORS.panel,
+    );
   }
 
   private drawStatusRow(y: number, innerWidth: number): void {
@@ -362,8 +398,15 @@ export class OpenTuiDrawApp extends FrameBufferRenderable {
               : previewChar
                 ? COLORS.preview
                 : COLORS.text;
-        const bg = isCursor ? COLORS.cursorBg : isHandle ? COLORS.handleBg : isSelected ? COLORS.selectionBg : COLORS.panel;
-        const attributes = isCursor || isSelected || isHandle ? TextAttributes.BOLD : TextAttributes.NONE;
+        const bg = isCursor
+          ? COLORS.cursorBg
+          : isHandle
+            ? COLORS.handleBg
+            : isSelected
+              ? COLORS.selectionBg
+              : COLORS.panel;
+        const attributes =
+          isCursor || isSelected || isHandle ? TextAttributes.BOLD : TextAttributes.NONE;
         this.frameBuffer.setCell(x + 1, rowY, cell, fg, bg, attributes);
       }
     }
@@ -411,7 +454,10 @@ export function buildHelpText(binaryName = "tui-draw"): string {
   );
 }
 
-export function createResizeHandler(renderer: CliRenderer, app: OpenTuiDrawApp): (width: number, height: number) => void {
+export function createResizeHandler(
+  renderer: CliRenderer,
+  app: OpenTuiDrawApp,
+): (width: number, height: number) => void {
   return (width: number, height: number) => {
     app.width = width;
     app.height = height;

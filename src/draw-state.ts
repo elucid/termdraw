@@ -209,7 +209,9 @@ function createCellConnections(): CellConnections {
 }
 
 function createConnectionGrid(width: number, height: number): ConnectionGrid {
-  return Array.from({ length: height }, () => Array.from({ length: width }, () => createCellConnections()));
+  return Array.from({ length: height }, () =>
+    Array.from({ length: width }, () => createCellConnections()),
+  );
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -257,7 +259,10 @@ function adjustConnection(
   target[style] = Math.max(0, target[style] + delta);
 }
 
-function applyBoxPerimeter(rect: Rect, applySegment: (x: number, y: number, direction: Direction) => void): void {
+function applyBoxPerimeter(
+  rect: Rect,
+  applySegment: (x: number, y: number, direction: Direction) => void,
+): void {
   if (rect.left === rect.right && rect.top === rect.bottom) return;
 
   for (let x = rect.left; x < rect.right; x += 1) {
@@ -400,12 +405,15 @@ function translateObject(object: DrawObject, dx: number, dy: number): DrawObject
 function objectContainsPoint(object: DrawObject, x: number, y: number): boolean {
   switch (object.type) {
     case "box": {
-      const withinBounds = x >= object.left && x <= object.right && y >= object.top && y <= object.bottom;
+      const withinBounds =
+        x >= object.left && x <= object.right && y >= object.top && y <= object.bottom;
       if (!withinBounds) return false;
       return x === object.left || x === object.right || y === object.top || y === object.bottom;
     }
     case "line":
-      return getLinePoints(object.x1, object.y1, object.x2, object.y2).some((point) => point.x === x && point.y === y);
+      return getLinePoints(object.x1, object.y1, object.x2, object.y2).some(
+        (point) => point.x === x && point.y === y,
+      );
     case "text":
       return y === object.y && x >= object.x && x < object.x + visibleCellCount(object.content);
   }
@@ -439,7 +447,8 @@ export class DrawState {
 
   private undoStack: Snapshot[] = [];
   private redoStack: Snapshot[] = [];
-  private status = "Line mode: drag on empty space to create a line object, or drag an existing object to move it.";
+  private status =
+    "Line mode: drag on empty space to create a line object, or drag an existing object to move it.";
 
   private sceneDirty = true;
   private renderCanvas: CanvasGrid = [];
@@ -505,7 +514,8 @@ export class DrawState {
   public handlePointerEvent(event: PointerEventLike): void {
     if (event.type === "scroll") {
       if (this.mode === "line") {
-        const direction = event.scrollDirection === "down" || event.scrollDirection === "left" ? -1 : 1;
+        const direction =
+          event.scrollDirection === "down" || event.scrollDirection === "left" ? -1 : 1;
         this.cycleBrush(direction);
       }
       return;
@@ -534,7 +544,9 @@ export class DrawState {
 
       if (this.pendingBox) {
         this.pendingBox.end = point;
-        this.setStatus(`Sizing box ${this.describeRect(normalizeRect(this.pendingBox.start, this.pendingBox.end))}.`);
+        this.setStatus(
+          `Sizing box ${this.describeRect(normalizeRect(this.pendingBox.start, this.pendingBox.end))}.`,
+        );
         return;
       }
 
@@ -593,7 +605,9 @@ export class DrawState {
           start: { x: canvasX, y: canvasY },
           end: { x: canvasX, y: canvasY },
         };
-        this.setStatus(`Box start at ${canvasX + 1},${canvasY + 1}. Drag to size, release to commit.`);
+        this.setStatus(
+          `Box start at ${canvasX + 1},${canvasY + 1}. Drag to size, release to commit.`,
+        );
         return;
       case "line":
         this.activeTextObjectId = null;
@@ -601,7 +615,9 @@ export class DrawState {
           start: { x: canvasX, y: canvasY },
           end: { x: canvasX, y: canvasY },
         };
-        this.setStatus(`Line start at ${canvasX + 1},${canvasY + 1}. Drag to endpoint, release to commit.`);
+        this.setStatus(
+          `Line start at ${canvasX + 1},${canvasY + 1}. Drag to endpoint, release to commit.`,
+        );
         return;
       case "text":
         this.placeTextCursor(canvasX, canvasY);
@@ -734,13 +750,21 @@ export class DrawState {
     }
 
     if (next === "select") {
-      this.setStatus("Select mode: drag objects to move them, box corners to resize, or line endpoints to adjust.");
+      this.setStatus(
+        "Select mode: drag objects to move them, box corners to resize, or line endpoints to adjust.",
+      );
     } else if (next === "line") {
-      this.setStatus("Line mode: drag on empty space to create a line object, or drag an existing object to move it.");
+      this.setStatus(
+        "Line mode: drag on empty space to create a line object, or drag an existing object to move it.",
+      );
     } else if (next === "box") {
-      this.setStatus("Box mode: drag on empty space to create a box object, or drag an existing object to move it.");
+      this.setStatus(
+        "Box mode: drag on empty space to create a box object, or drag an existing object to move it.",
+      );
     } else {
-      this.setStatus("Text mode: click empty space to type, click text to edit, or drag an existing object to move it.");
+      this.setStatus(
+        "Text mode: click empty space to type, click text to edit, or drag an existing object to move it.",
+      );
     }
   }
 
@@ -957,7 +981,9 @@ export class DrawState {
         endpoint: handleHit.endpoint,
         pushedUndo: false,
       };
-      this.setStatus(`Selected ${this.describeObject(handleHit.object)}. Drag endpoint to adjust it.`);
+      this.setStatus(
+        `Selected ${this.describeObject(handleHit.object)}. Drag endpoint to adjust it.`,
+      );
       return true;
     }
 
@@ -972,7 +998,12 @@ export class DrawState {
     const hit = this.findTopmostObjectAt(x, y);
     if (!hit) return false;
 
-    this.beginMoveInteraction(hit, x, y, `Selected ${this.describeObject(hit)}. Drag to move it without leaving ${this.getModeLabel().toLowerCase()} mode.`);
+    this.beginMoveInteraction(
+      hit,
+      x,
+      y,
+      `Selected ${this.describeObject(hit)}. Drag to move it without leaving ${this.getModeLabel().toLowerCase()} mode.`,
+    );
     return true;
   }
 
@@ -1064,7 +1095,10 @@ export class DrawState {
         if (this.mode === "text" && dragState.kind === "move" && object?.type === "text") {
           this.selectedObjectId = object.id;
           this.activeTextObjectId = object.id;
-          this.cursorX = Math.min(this.canvasWidth - 1, object.x + visibleCellCount(object.content));
+          this.cursorX = Math.min(
+            this.canvasWidth - 1,
+            object.x + visibleCellCount(object.content),
+          );
           this.cursorY = object.y;
           this.setStatus(`Editing ${this.describeObject(object)}.`);
           return;
@@ -1109,14 +1143,25 @@ export class DrawState {
         break;
       }
       case "resize-box":
-        nextObject = this.resizeBoxWithinCanvas(this.dragState.originalObject, this.dragState.handle, point);
+        nextObject = this.resizeBoxWithinCanvas(
+          this.dragState.originalObject,
+          this.dragState.handle,
+          point,
+        );
         break;
       case "line-endpoint":
-        nextObject = this.adjustLineEndpointWithinCanvas(this.dragState.originalObject, this.dragState.endpoint, point);
+        nextObject = this.adjustLineEndpointWithinCanvas(
+          this.dragState.originalObject,
+          this.dragState.endpoint,
+          point,
+        );
         break;
     }
 
-    if (!this.dragState.pushedUndo && !this.objectsEqual(nextObject, this.dragState.originalObject)) {
+    if (
+      !this.dragState.pushedUndo &&
+      !this.objectsEqual(nextObject, this.dragState.originalObject)
+    ) {
       this.pushUndo();
       this.dragState.pushedUndo = true;
       nextObject = this.bringObjectToFront(nextObject);
@@ -1207,7 +1252,9 @@ export class DrawState {
   }
 
   private restoreSnapshot(snapshot: Snapshot): void {
-    this.objects = cloneObjects(snapshot.objects).map((object) => this.shiftObjectInsideCanvas(object));
+    this.objects = cloneObjects(snapshot.objects).map((object) =>
+      this.shiftObjectInsideCanvas(object),
+    );
     this.selectedObjectId = snapshot.selectedObjectId;
     this.cursorX = Math.max(0, Math.min(snapshot.cursorX, this.canvasWidth - 1));
     this.cursorY = Math.max(0, Math.min(snapshot.cursorY, this.canvasHeight - 1));
@@ -1235,7 +1282,16 @@ export class DrawState {
         case "box": {
           const style = this.getBoxStyle(object, object.id);
           applyBoxPerimeter(object, (x, y, direction) => {
-            adjustConnection(this.renderConnections, this.canvasWidth, this.canvasHeight, x, y, direction, style, 1);
+            adjustConnection(
+              this.renderConnections,
+              this.canvasWidth,
+              this.canvasHeight,
+              x,
+              y,
+              direction,
+              style,
+              1,
+            );
           });
           break;
         }
@@ -1340,7 +1396,12 @@ export class DrawState {
     const depth = this.objects.filter((object) => {
       if (object.type !== "box") return false;
       if (object.id === ignoreId) return false;
-      return rect.left > object.left && rect.right < object.right && rect.top > object.top && rect.bottom < object.bottom;
+      return (
+        rect.left > object.left &&
+        rect.right < object.right &&
+        rect.top > object.top &&
+        rect.bottom < object.bottom
+      );
     }).length;
 
     return depth % 2 === 0 ? "heavy" : "light";
@@ -1379,7 +1440,10 @@ export class DrawState {
 
     for (const { object } of indexedObjects) {
       if (object.type === "box") {
-        for (const [handle, point] of Object.entries(getBoxCornerPoints(object)) as [BoxResizeHandle, Point][]) {
+        for (const [handle, point] of Object.entries(getBoxCornerPoints(object)) as [
+          BoxResizeHandle,
+          Point,
+        ][]) {
           if (point.x === x && point.y === y) {
             return { kind: "box-corner", object, handle };
           }
@@ -1387,7 +1451,10 @@ export class DrawState {
       }
 
       if (object.type === "line") {
-        for (const [endpoint, point] of Object.entries(getLineEndpointPoints(object)) as [LineEndpointHandle, Point][]) {
+        for (const [endpoint, point] of Object.entries(getLineEndpointPoints(object)) as [
+          LineEndpointHandle,
+          Point,
+        ][]) {
           if (point.x === x && point.y === y) {
             return { kind: "line-endpoint", object, endpoint };
           }
@@ -1411,7 +1478,11 @@ export class DrawState {
     return null;
   }
 
-  private translateObjectWithinCanvas(object: DrawObject, desiredDx: number, desiredDy: number): DrawObject {
+  private translateObjectWithinCanvas(
+    object: DrawObject,
+    desiredDx: number,
+    desiredDy: number,
+  ): DrawObject {
     const bounds = getObjectBounds(object);
 
     const minDx = -bounds.left;
@@ -1440,7 +1511,11 @@ export class DrawState {
     };
   }
 
-  private adjustLineEndpointWithinCanvas(line: LineObject, endpoint: LineEndpointHandle, point: Point): LineObject {
+  private adjustLineEndpointWithinCanvas(
+    line: LineObject,
+    endpoint: LineEndpointHandle,
+    point: Point,
+  ): LineObject {
     const clampedPoint = this.clampPointInsideCanvas(point);
 
     if (endpoint === "start") {
@@ -1558,11 +1633,26 @@ export class DrawState {
 
     switch (a.type) {
       case "box":
-        return a.left === (b as BoxObject).left && a.right === (b as BoxObject).right && a.top === (b as BoxObject).top && a.bottom === (b as BoxObject).bottom;
+        return (
+          a.left === (b as BoxObject).left &&
+          a.right === (b as BoxObject).right &&
+          a.top === (b as BoxObject).top &&
+          a.bottom === (b as BoxObject).bottom
+        );
       case "line":
-        return a.x1 === (b as LineObject).x1 && a.y1 === (b as LineObject).y1 && a.x2 === (b as LineObject).x2 && a.y2 === (b as LineObject).y2 && a.brush === (b as LineObject).brush;
+        return (
+          a.x1 === (b as LineObject).x1 &&
+          a.y1 === (b as LineObject).y1 &&
+          a.x2 === (b as LineObject).x2 &&
+          a.y2 === (b as LineObject).y2 &&
+          a.brush === (b as LineObject).brush
+        );
       case "text":
-        return a.x === (b as TextObject).x && a.y === (b as TextObject).y && a.content === (b as TextObject).content;
+        return (
+          a.x === (b as TextObject).x &&
+          a.y === (b as TextObject).y &&
+          a.content === (b as TextObject).content
+        );
     }
   }
 

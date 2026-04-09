@@ -1,21 +1,41 @@
 {
   "name": "tui-draw",
-  "module": "index.ts",
-  "type": "module",
   "private": true,
+  "type": "module",
+  "module": "index.ts",
   "scripts": {
     "start": "bun run index.ts",
     "dev": "bun --watch run index.ts",
     "test": "bun test",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "format": "oxfmt .",
+    "format:check": "oxfmt --check .",
+    "lint": "oxlint .",
+    "lint:fix": "oxlint --fix .",
+    "prepare": "simple-git-hooks"
+  },
+  "dependencies": {
+    "@opentui/core": "^0.1.97"
   },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "lint-staged": "^16.4.0",
+    "oxfmt": "^0.44.0",
+    "oxlint": "^1.59.0",
+    "simple-git-hooks": "^2.13.1"
   },
   "peerDependencies": {
     "typescript": "^5"
   },
-  "dependencies": {
-    "@opentui/core": "^0.1.97"
+  "simple-git-hooks": {
+    "pre-commit": "bunx lint-staged"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx,mjs,cjs,mts,cts,json,jsonc,md}": [
+      "oxfmt --write"
+    ],
+    "*.{js,jsx,ts,tsx,mjs,cjs,mts,cts}": [
+      "oxlint --fix --quiet"
+    ]
   }
 }
