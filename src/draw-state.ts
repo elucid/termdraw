@@ -15,7 +15,7 @@ export const INK_COLORS = [
 const MAX_HISTORY = 100;
 const HANDLE_CHARACTER = "●";
 
-export type DrawMode = "box" | "line" | "text";
+export type DrawMode = "box" | "line" | "paint" | "text";
 export type BoxStyle = (typeof BOX_STYLES)[number];
 export type InkColor = (typeof INK_COLORS)[number];
 type CanvasGrid = string[][];
@@ -55,6 +55,12 @@ type LineObject = BaseDrawObject & {
   brush: string;
 };
 
+type PaintObject = BaseDrawObject & {
+  type: "paint";
+  points: Point[];
+  brush: string;
+};
+
 type TextObject = BaseDrawObject & {
   type: "text";
   x: number;
@@ -62,7 +68,7 @@ type TextObject = BaseDrawObject & {
   content: string;
 };
 
-export type DrawObject = BoxObject | LineObject | TextObject;
+export type DrawObject = BoxObject | LineObject | PaintObject | TextObject;
 
 type Snapshot = {
   objects: DrawObject[];
@@ -75,6 +81,7 @@ type Snapshot = {
 
 type PendingBox = { start: Point; end: Point };
 type PendingLine = { start: Point; end: Point };
+type PendingPaint = { points: Point[]; lastPoint: Point };
 
 type MoveDragState = {
   kind: "move";
@@ -297,6 +304,13 @@ function getRectPerimeterPoints(rect: Rect): Point[] {
 }
 
 function cloneObject(object: DrawObject): DrawObject {
+  if (object.type === "paint") {
+    return {
+      ...object,
+      points: object.points.map((point) => ({ ...point })),
+    };
+  }
+
   return { ...object };
 }
 
@@ -432,12 +446,53 @@ function getLinePoints(x0: number, y0: number, x1: number, y1: number): Point[] 
   return points;
 }
 
+function mergeUniquePoints(existing: Point[], next: Point[]): Point[] {
+  const merged = existing.map((point) => ({ ...point }));
+  const seen = new Set(existing.map((point) => `${point.x},${point.y}`));
+
+  for (const point of next) {
+    const key = `${point.x},${point.y}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.push({ ...point });
+  }
+
+  return merged;
+}
+
+function appendPaintSegment(points: Point[], from: Point, to: Point): Point[] {
+  return mergeUniquePoints(points, getLinePoints(from.x, from.y, to.x, to.y));
+}
+
+function pointsEqual(a: Point[], b: Point[]): boolean {
+  return (
+    a.length === b.length &&
+    a.every((point, index) => point.x === b[index]?.x && point.y === b[index]?.y)
+  );
+}
+
 function getObjectBounds(object: DrawObject): Rect {
   switch (object.type) {
     case "box":
       return { left: object.left, top: object.top, right: object.right, bottom: object.bottom };
     case "line":
       return normalizeRect({ x: object.x1, y: object.y1 }, { x: object.x2, y: object.y2 });
+    case "paint": {
+      const [firstPoint] = object.points;
+      let left = firstPoint?.x ?? 0;
+      let right = firstPoint?.x ?? 0;
+      let top = firstPoint?.y ?? 0;
+      let bottom = firstPoint?.y ?? 0;
+
+      for (const point of object.points) {
+        left = Math.min(left, point.x);
+        right = Math.max(right, point.x);
+        top = Math.min(top, point.y);
+        bottom = Math.max(bottom, point.y);
+      }
+
+      return { left, top, right, bottom };
+    }
     case "text": {
       const width = Math.max(1, visibleCellCount(object.content));
       return {
@@ -543,6 +598,8 @@ function getObjectRenderCells(object: DrawObject): Point[] {
     }
     case "line":
       return getLinePoints(object.x1, object.y1, object.x2, object.y2);
+    case "paint":
+      return object.points.map((point) => ({ ...point }));
     case "text":
       return splitGraphemes(object.content).map((_, index) => ({
         x: object.x + index,
@@ -569,6 +626,11 @@ function translateObject(object: DrawObject, dx: number, dy: number): DrawObject
         y1: object.y1 + dy,
         y2: object.y2 + dy,
       };
+    case "paint":
+      return {
+        ...object,
+        points: object.points.map((point) => ({ x: point.x + dx, y: point.y + dy })),
+      };
     case "text":
       return {
         ...object,
@@ -590,6 +652,8 @@ function objectContainsPoint(object: DrawObject, x: number, y: number): boolean 
       return getLinePoints(object.x1, object.y1, object.x2, object.y2).some(
         (point) => point.x === x && point.y === y,
       );
+    case "paint":
+      return object.points.some((point) => point.x === x && point.y === y);
     case "text":
       return y === object.y && x >= object.x && x < object.x + visibleCellCount(object.content);
   }
@@ -619,6 +683,7 @@ export class DrawState {
 
   private pendingLine: PendingLine | null = null;
   private pendingBox: PendingBox | null = null;
+  private pendingPaint: PendingPaint | null = null;
   private dragState: DragState | null = null;
   private eraseState: EraseState | null = null;
 
@@ -688,6 +753,7 @@ export class DrawState {
     return (
       this.pendingLine !== null ||
       this.pendingBox !== null ||
+      this.pendingPaint !== null ||
       this.dragState !== null ||
       this.eraseState !== null
     );
@@ -709,6 +775,7 @@ export class DrawState {
     this.setObjects(this.objects.map((object) => this.shiftObjectInsideCanvas(object)));
     this.pendingLine = null;
     this.pendingBox = null;
+    this.pendingPaint = null;
     this.dragState = null;
     this.eraseState = null;
   }
@@ -718,7 +785,7 @@ export class DrawState {
       const direction =
         event.scrollDirection === "down" || event.scrollDirection === "left" ? -1 : 1;
 
-      if (this.mode === "line") {
+      if (this.mode === "line" || this.mode === "paint") {
         this.cycleBrush(direction);
       } else if (this.mode === "box") {
         this.cycleBoxStyle(direction);
@@ -758,6 +825,17 @@ export class DrawState {
       if (this.pendingLine) {
         this.pendingLine.end = point;
         this.setStatus(`Sizing line to ${point.x + 1},${point.y + 1}.`);
+        return;
+      }
+
+      if (this.pendingPaint) {
+        this.pendingPaint.points = appendPaintSegment(
+          this.pendingPaint.points,
+          this.pendingPaint.lastPoint,
+          point,
+        );
+        this.pendingPaint.lastPoint = point;
+        this.setStatus(`Painting to ${point.x + 1},${point.y + 1}.`);
         return;
       }
 
@@ -816,6 +894,15 @@ export class DrawState {
           `Line start at ${canvasX + 1},${canvasY + 1}. Drag to endpoint, release to commit.`,
         );
         return;
+      case "paint":
+        this.selectedObjectId = null;
+        this.activeTextObjectId = null;
+        this.pendingPaint = {
+          points: [{ x: canvasX, y: canvasY }],
+          lastPoint: { x: canvasX, y: canvasY },
+        };
+        this.setStatus(`Paint start at ${canvasX + 1},${canvasY + 1}. Drag to paint.`);
+        return;
       case "text":
         this.placeTextCursor(canvasX, canvasY);
         return;
@@ -828,12 +915,15 @@ export class DrawState {
         return "LINE";
       case "box":
         return "BOX";
+      case "paint":
+        return "PAINT";
       case "text":
         return "TEXT";
     }
   }
 
   public getActivePreviewCharacters(): Map<string, string> {
+    if (this.pendingPaint) return this.getPaintPreviewCharacters();
     if (this.pendingLine) return this.getLinePreviewCharacters();
     if (this.pendingBox) return this.getBoxPreviewCharacters();
     return new Map<string, string>();
@@ -995,7 +1085,7 @@ export class DrawState {
   }
 
   public cycleMode(): void {
-    const order: DrawMode[] = ["box", "line", "text"];
+    const order: DrawMode[] = ["box", "line", "paint", "text"];
     const currentIndex = order.indexOf(this.mode);
     const next = order[(currentIndex + 1) % order.length] ?? "line";
     this.setMode(next);
@@ -1006,6 +1096,7 @@ export class DrawState {
     this.mode = next;
     this.pendingLine = null;
     this.pendingBox = null;
+    this.pendingPaint = null;
     this.dragState = null;
     this.eraseState = null;
     if (next !== "text") {
@@ -1020,6 +1111,10 @@ export class DrawState {
       this.setStatus(
         `Box mode (${this.describeBoxStyle(this.boxStyle)}): drag on empty space to create a box. Click objects to move them, or drag box corners to resize.`,
       );
+    } else if (next === "paint") {
+      this.setStatus(
+        "Paint mode: drag on empty space to paint. Click objects to move them, and use the current brush for freehand strokes.",
+      );
     } else {
       this.setStatus(
         "Text mode: click empty space to type, click text to edit, and use its virtual selection box to move it.",
@@ -1029,6 +1124,24 @@ export class DrawState {
 
   public stampBrushAtCursor(): void {
     this.pushUndo();
+
+    if (this.mode === "paint") {
+      const object: PaintObject = {
+        id: this.createObjectId(),
+        z: this.allocateZIndex(),
+        parentId: null,
+        color: this.inkColor,
+        type: "paint",
+        points: [{ x: this.cursorX, y: this.cursorY }],
+        brush: this.brush,
+      };
+      this.setObjects([...this.objects, object]);
+      this.selectedObjectId = object.id;
+      this.activeTextObjectId = null;
+      this.setStatus(`Painted "${this.brush}" at ${this.cursorX + 1},${this.cursorY + 1}.`);
+      return;
+    }
+
     const object: LineObject = {
       id: this.createObjectId(),
       z: this.allocateZIndex(),
@@ -1154,6 +1267,7 @@ export class DrawState {
     this.activeTextObjectId = null;
     this.pendingLine = null;
     this.pendingBox = null;
+    this.pendingPaint = null;
     this.dragState = null;
     this.eraseState = null;
     this.markSceneDirty();
@@ -1291,6 +1405,7 @@ export class DrawState {
   private beginEraseSession(): void {
     this.pendingLine = null;
     this.pendingBox = null;
+    this.pendingPaint = null;
     this.dragState = null;
     this.activeTextObjectId = null;
     this.eraseState = {
@@ -1348,6 +1463,26 @@ export class DrawState {
         y1: start.y,
         x2: end.x,
         y2: end.y,
+        brush: this.brush,
+      };
+      this.setObjects([...this.objects, object]);
+      this.selectedObjectId = object.id;
+      this.setStatus(`Created ${this.describeObject(this.getObjectById(object.id) ?? object)}.`);
+      return;
+    }
+
+    if (this.pendingPaint) {
+      const points = this.pendingPaint.points.map((pointEntry) => ({ ...pointEntry }));
+      this.pendingPaint = null;
+
+      this.pushUndo();
+      const object: PaintObject = {
+        id: this.createObjectId(),
+        z: this.allocateZIndex(),
+        parentId: null,
+        color: this.inkColor,
+        type: "paint",
+        points,
         brush: this.brush,
       };
       this.setObjects([...this.objects, object]);
@@ -1559,6 +1694,7 @@ export class DrawState {
     this.activeTextObjectId = null;
     this.pendingLine = null;
     this.pendingBox = null;
+    this.pendingPaint = null;
     this.dragState = null;
     this.eraseState = null;
     this.markSceneDirty();
@@ -1604,6 +1740,12 @@ export class DrawState {
         }
         case "line": {
           for (const point of getLinePoints(object.x1, object.y1, object.x2, object.y2)) {
+            this.paintRenderCell(point.x, point.y, object.brush, object.color);
+          }
+          break;
+        }
+        case "paint": {
+          for (const point of object.points) {
             this.paintRenderCell(point.x, point.y, object.brush, object.color);
           }
           break;
@@ -1661,6 +1803,18 @@ export class DrawState {
       this.pendingLine.end.x,
       this.pendingLine.end.y,
     )) {
+      if (!this.isInsideCanvas(point.x, point.y)) continue;
+      preview.set(`${point.x},${point.y}`, this.brush);
+    }
+
+    return preview;
+  }
+
+  private getPaintPreviewCharacters(): Map<string, string> {
+    const preview = new Map<string, string>();
+    if (!this.pendingPaint) return preview;
+
+    for (const point of this.pendingPaint.points) {
       if (!this.isInsideCanvas(point.x, point.y)) continue;
       preview.set(`${point.x},${point.y}`, this.brush);
     }
@@ -1958,6 +2112,15 @@ export class DrawState {
           y2: end.y,
         };
       }
+      case "paint": {
+        const mappedPoints = object.points.map((point) =>
+          this.mapPointBetweenRects(point, originalContentBounds, nextContentBounds),
+        );
+        return {
+          ...object,
+          points: mergeUniquePoints([], mappedPoints),
+        };
+      }
       case "text": {
         const mapped = this.mapPointBetweenRects(
           { x: object.x, y: object.y },
@@ -2191,6 +2354,10 @@ export class DrawState {
         return `box ${this.describeRect(object)}`;
       case "line":
         return `line ${object.x1 + 1},${object.y1 + 1} → ${object.x2 + 1},${object.y2 + 1}`;
+      case "paint": {
+        const bounds = getObjectBounds(object);
+        return `paint ${this.describeRect(bounds)}`;
+      }
       case "text":
         return `text "${object.content}" at ${object.x + 1},${object.y + 1}`;
     }
@@ -2217,6 +2384,10 @@ export class DrawState {
           a.x2 === (b as LineObject).x2 &&
           a.y2 === (b as LineObject).y2 &&
           a.brush === (b as LineObject).brush
+        );
+      case "paint":
+        return (
+          a.brush === (b as PaintObject).brush && pointsEqual(a.points, (b as PaintObject).points)
         );
       case "text":
         return (

@@ -42,6 +42,47 @@ describe("DrawState", () => {
     expect(state.getCompositeCell(10, 4)).toBe(" ");
   });
 
+  test("paint mode creates a freehand painted object", () => {
+    const state = new DrawState(20, 12);
+    state.setMode("paint");
+
+    const start = canvasPoint(state, 1, 1);
+    const mid = canvasPoint(state, 4, 1);
+    const end = canvasPoint(state, 4, 3);
+    state.handlePointerEvent({ type: "down", button: MouseButton.LEFT, ...start });
+    state.handlePointerEvent({ type: "drag", button: MouseButton.LEFT, ...mid });
+    state.handlePointerEvent({ type: "drag", button: MouseButton.LEFT, ...end });
+    state.handlePointerEvent({ type: "up", button: MouseButton.LEFT, ...end });
+
+    expect(state.getCompositeCell(1, 1)).toBe("#");
+    expect(state.getCompositeCell(2, 1)).toBe("#");
+    expect(state.getCompositeCell(3, 1)).toBe("#");
+    expect(state.getCompositeCell(4, 1)).toBe("#");
+    expect(state.getCompositeCell(4, 2)).toBe("#");
+    expect(state.getCompositeCell(4, 3)).toBe("#");
+  });
+
+  test("paint objects can be clicked and dragged", () => {
+    const state = new DrawState(24, 12);
+    state.setMode("paint");
+
+    const start = canvasPoint(state, 1, 1);
+    const end = canvasPoint(state, 3, 1);
+    state.handlePointerEvent({ type: "down", button: MouseButton.LEFT, ...start });
+    state.handlePointerEvent({ type: "drag", button: MouseButton.LEFT, ...end });
+    state.handlePointerEvent({ type: "up", button: MouseButton.LEFT, ...end });
+
+    const dragStart = canvasPoint(state, 2, 1);
+    const dragEnd = canvasPoint(state, 5, 3);
+    state.handlePointerEvent({ type: "down", button: MouseButton.LEFT, ...dragStart });
+    state.handlePointerEvent({ type: "drag", button: MouseButton.LEFT, ...dragEnd });
+    state.handlePointerEvent({ type: "up", button: MouseButton.LEFT, ...dragEnd });
+
+    expect(state.getCompositeCell(1, 1)).toBe(" ");
+    expect(state.getCompositeCell(4, 3)).toBe("#");
+    expect(state.getCompositeCell(6, 3)).toBe("#");
+  });
+
   test("nested auto boxes still alternate heavy and light borders", () => {
     const state = new DrawState(30, 12);
     state.setMode("box");
