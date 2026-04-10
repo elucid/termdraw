@@ -12,15 +12,15 @@ What works today:
 
 - opens termDRAW in a full-screen Pi overlay
 - keyboard and mouse input are forwarded into the Bun/OpenTUI surface
+- save/export now comes back into the Pi editor via the `opentui-island` result bridge
 - termDRAW runs inside terminal Pi without moving the main Pi process off Node
 
-What is intentionally not wired yet:
+What is still intentionally not solved yet:
 
-- save/export back into Pi's editor
-- structured save/cancel result passing from the Bun sidecar back to the Node host
 - `pi-gui` support if the client is running through Pi RPC-only extension UI
+- richer host/island commands beyond the save/cancel bridge
 
-For now, use `Ctrl+Q` to close the overlay. `Enter` and `Ctrl+S` are intercepted and show a placeholder status because the result bridge is still pending.
+Use `Enter` or `Ctrl+S` to insert the drawing into Pi. Use `Ctrl+Q` to close without inserting.
 
 ## Install locally
 
@@ -54,6 +54,6 @@ Inside Pi:
 
 - Requires Bun 1.3+ on the machine running Pi.
 - The embedded island currently loads from source (`islands/termdraw.island.tsx`) via Bun.
-- For local development, `--legacy-peer-deps` is currently needed because published `opentui-island@0.2.0` still declares an older optional `@mariozechner/pi-tui` peer range than current Pi packages.
+- For local development, `opentui-island@0.3.0` is used for save/cancel result bridging. Its optional `@mariozechner/pi-tui` peer range is still older than current Pi packages, so `npm` users may still need `--legacy-peer-deps` in some setups.
 - Before publishing `pi-termdraw`, switch the local `file:../tui` dependency back to a real semver release of `@benvinegar/termdraw`.
 - This package targets the terminal Pi experience first. GUI support will depend on Pi's extension UI surface.

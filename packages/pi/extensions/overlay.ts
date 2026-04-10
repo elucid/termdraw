@@ -6,6 +6,7 @@ import {
   type Component,
   type TUI,
 } from "@mariozechner/pi-tui";
+import type { OpenTuiBridgeEvent } from "opentui-island";
 import {
   createPiTuiOpenTuiSurface,
   disablePiTuiMouseMode,
@@ -15,12 +16,28 @@ import {
 
 const TERM_DRAW_ISLAND_MODULE_URL = new URL("../islands/termdraw.island.tsx", import.meta.url);
 const READY_STATUS =
-  "Prototype embed active. Draw/edit works here; Enter and Ctrl+S are placeholder-only until save bridging lands. Ctrl+Q closes.";
-const SAVE_PENDING_STATUS =
-  "Save/export result passing is not wired yet. The Pi overlay can host termDRAW now, but returning art to Pi will come in a follow-up bridge.";
+  "termDRAW ready. Press Enter or Ctrl+S to insert the drawing into Pi. Ctrl+Q closes.";
 const LOADING_STATUS = "Starting termDRAW in a Bun sidecar…";
-const CLOSED_MESSAGE = "Closed termDRAW overlay.";
+const INSERTED_MESSAGE = "Inserted drawing into the Pi editor.";
+const CANCELLED_MESSAGE = "Drawing cancelled.";
 const ERROR_PREFIX = "termDRAW failed to start:";
+
+type TermDrawSaveEvent = OpenTuiBridgeEvent<"save", { art: string }>;
+type TermDrawCancelEvent = OpenTuiBridgeEvent<"cancel", { reason?: string }>;
+type TermDrawOverlayResult = { kind: "save"; art: string } | { kind: "cancel" };
+
+function isTermDrawSaveEvent(event: OpenTuiBridgeEvent): event is TermDrawSaveEvent {
+  return (
+    event.type === "save" &&
+    !!event.payload &&
+    typeof event.payload === "object" &&
+    "art" in event.payload
+  );
+}
+
+function isTermDrawCancelEvent(event: OpenTuiBridgeEvent): event is TermDrawCancelEvent {
+  return event.type === "cancel";
+}
 
 function padLine(text: string, width: number): string {
   const truncated = truncateToWidth(text, width, "", true);
@@ -31,17 +48,24 @@ function formatError(error: unknown): string {
   return error instanceof Error ? `${error.name}: ${error.message}` : String(error);
 }
 
+function formatForEditor(art: string): string {
+  const content = art.length > 0 ? art : " ";
+  return `\`\`\`text\n${content}\n\`\`\``;
+}
+
 class TermDrawOverlay implements Component {
   private readonly surfaceHeight: number;
   private readonly width: number;
   private surface: PiTuiOpenTuiSurface | null = null;
+  private unsubscribeFromEvents: (() => void) | null = null;
   private status = LOADING_STATUS;
   private error: string | null = null;
+  private closing = false;
 
   constructor(
     private readonly tui: TUI,
     private readonly theme: Theme,
-    private readonly done: (value: "closed") => void,
+    private readonly done: (value: TermDrawOverlayResult) => void,
   ) {
     this.width = Math.max(1, this.tui.terminal.columns);
     this.surfaceHeight = Math.max(1, this.tui.terminal.rows - 1);
@@ -62,6 +86,16 @@ class TermDrawOverlay implements Component {
           },
         },
       });
+      this.unsubscribeFromEvents = this.surface.onEvent((event) => {
+        if (isTermDrawSaveEvent(event)) {
+          void this.close({ kind: "save", art: event.payload.art });
+          return;
+        }
+
+        if (isTermDrawCancelEvent(event)) {
+          void this.close({ kind: "cancel" });
+        }
+      });
       this.surface.focused = true;
       this.surface.setScreenBounds({
         row: 0,
@@ -80,14 +114,11 @@ class TermDrawOverlay implements Component {
   }
 
   handleInput(data: string): void {
-    if (matchesKey(data, "ctrl+q")) {
-      void this.close();
-      return;
-    }
-
-    if (matchesKey(data, "enter") || matchesKey(data, "ctrl+s")) {
-      this.status = SAVE_PENDING_STATUS;
-      this.tui.requestRender();
+    if (
+      this.error &&
+      (matchesKey(data, "ctrl+q") || matchesKey(data, "escape") || matchesKey(data, "ctrl+c"))
+    ) {
+      void this.close({ kind: "cancel" });
       return;
     }
 
@@ -123,7 +154,10 @@ class TermDrawOverlay implements Component {
         return " ".repeat(normalizedWidth);
       });
 
-      return [...body, padLine(this.theme.fg("warning", "Ctrl+Q closes."), normalizedWidth)];
+      return [
+        ...body,
+        padLine(this.theme.fg("warning", "Ctrl+Q, Esc, or Ctrl+C closes."), normalizedWidth),
+      ];
     }
 
     if (!this.surface) {
@@ -133,7 +167,7 @@ class TermDrawOverlay implements Component {
           : " ".repeat(normalizedWidth),
       );
 
-      return [...body, padLine(this.theme.fg("dim", "Ctrl+Q closes."), normalizedWidth)];
+      return [...body, padLine(this.theme.fg("dim", "Loading termDRAW…"), normalizedWidth)];
     }
 
     const body = this.surface.render(normalizedWidth).slice(0, this.surfaceHeight);
@@ -141,12 +175,19 @@ class TermDrawOverlay implements Component {
     return [...body, footer];
   }
 
-  private async close(): Promise<void> {
+  private async close(result: TermDrawOverlayResult): Promise<void> {
+    if (this.closing) {
+      return;
+    }
+
+    this.closing = true;
     try {
+      this.unsubscribeFromEvents?.();
+      this.unsubscribeFromEvents = null;
       await this.surface?.destroy();
     } finally {
       disablePiTuiMouseMode(this.tui.terminal);
-      this.done("closed");
+      this.done(result);
     }
   }
 }
@@ -156,7 +197,7 @@ export async function runTermDrawCommand(ctx: ExtensionCommandContext): Promise<
     return;
   }
 
-  await ctx.ui.custom<"closed">(
+  const result = await ctx.ui.custom<TermDrawOverlayResult>(
     (tui, theme, _keybindings, done) => new TermDrawOverlay(tui, theme, done),
     {
       overlay: true,
@@ -170,5 +211,13 @@ export async function runTermDrawCommand(ctx: ExtensionCommandContext): Promise<
     },
   );
 
-  ctx.ui.notify(CLOSED_MESSAGE, "info");
+  if (!result || result.kind === "cancel") {
+    ctx.ui.notify(CANCELLED_MESSAGE, "info");
+    return;
+  }
+
+  const existing = ctx.ui.getEditorText();
+  const prefix = existing.endsWith("\n") || existing.length === 0 ? "" : "\n";
+  ctx.ui.pasteToEditor(`${prefix}${formatForEditor(result.art)}\n`);
+  ctx.ui.notify(INSERTED_MESSAGE, "info");
 }

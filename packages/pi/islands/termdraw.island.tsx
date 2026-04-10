@@ -1,5 +1,6 @@
 /** @jsxImportSource @opentui/react */
 
+import { useOpenTuiIslandBridge } from "opentui-island";
 import { TermDrawApp } from "@benvinegar/termdraw";
 
 type PiTermDrawIslandProps = {
@@ -7,6 +8,8 @@ type PiTermDrawIslandProps = {
 };
 
 export default function PiTermDrawIsland({ showStartupLogo = false }: PiTermDrawIslandProps) {
+  const bridge = useOpenTuiIslandBridge();
+
   return (
     <TermDrawApp
       width="100%"
@@ -14,6 +17,18 @@ export default function PiTermDrawIsland({ showStartupLogo = false }: PiTermDraw
       autoFocus
       showStartupLogo={showStartupLogo}
       cancelOnCtrlC={false}
+      onSave={(art) => {
+        bridge.emit({
+          type: "save",
+          payload: { art },
+        });
+      }}
+      onCancel={() => {
+        bridge.emit({
+          type: "cancel",
+          payload: { reason: "user" },
+        });
+      }}
     />
   );
 }

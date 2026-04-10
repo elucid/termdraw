@@ -21,7 +21,7 @@
         "@benvinegar/termdraw": "file:../tui",
         "@opentui/core": "^0.1.97",
         "@opentui/react": "^0.1.97",
-        "opentui-island": "^0.2.0",
+        "opentui-island": "^0.3.0",
         "react": "^19.2.0",
       },
       "devDependencies": {
@@ -683,7 +683,7 @@
 
     "openai": ["openai@6.26.0", "", { "peerDependencies": { "ws": "^8.18.0", "zod": "^3.25 || ^4.0" }, "optionalPeers": ["ws", "zod"], "bin": { "openai": "bin/cli" } }, "sha512-zd23dbWTjiJ6sSAX6s0HrCZi41JwTA1bQVs0wLQPZ2/5o2gxOJA5wh7yOAUgwYybfhDXyhwlpeQf7Mlgx8EOCA=="],
 
-    "opentui-island": ["opentui-island@0.2.0", "", { "peerDependencies": { "@mariozechner/pi-tui": "^0.65.2", "@opentui/core": "^0.1.97", "@opentui/react": "^0.1.97", "ink": "^7.0.0", "react": "^19.2.4" }, "optionalPeers": ["@mariozechner/pi-tui", "ink"] }, "sha512-Cy+82tRimXCC52Wml3rJmrBP8XJOZqNN+wtnwkCgAxgbBxOTohUhQV7rT6c9rniArXpLIWfuFiYcg5JDxt3oOQ=="],
+    "opentui-island": ["opentui-island@0.3.0", "", { "peerDependencies": { "@mariozechner/pi-tui": "^0.65.2", "@opentui/core": "^0.1.97", "@opentui/react": "^0.1.97", "ink": "^7.0.0", "react": "^19.2.4" }, "optionalPeers": ["@mariozechner/pi-tui", "ink"] }, "sha512-HMX0VARLtBSQEiPD4DenKDhqRi5xq0X28tQaMnkTEyPO4HbUnLcu07NNT3SScez8Aw/aaUf8SGK+UGfEFoC0oA=="],
 
     "oxfmt": ["oxfmt@0.44.0", "", { "dependencies": { "tinypool": "2.1.0" }, "optionalDependencies": { "@oxfmt/binding-android-arm-eabi": "0.44.0", "@oxfmt/binding-android-arm64": "0.44.0", "@oxfmt/binding-darwin-arm64": "0.44.0", "@oxfmt/binding-darwin-x64": "0.44.0", "@oxfmt/binding-freebsd-x64": "0.44.0", "@oxfmt/binding-linux-arm-gnueabihf": "0.44.0", "@oxfmt/binding-linux-arm-musleabihf": "0.44.0", "@oxfmt/binding-linux-arm64-gnu": "0.44.0", "@oxfmt/binding-linux-arm64-musl": "0.44.0", "@oxfmt/binding-linux-ppc64-gnu": "0.44.0", "@oxfmt/binding-linux-riscv64-gnu": "0.44.0", "@oxfmt/binding-linux-riscv64-musl": "0.44.0", "@oxfmt/binding-linux-s390x-gnu": "0.44.0", "@oxfmt/binding-linux-x64-gnu": "0.44.0", "@oxfmt/binding-linux-x64-musl": "0.44.0", "@oxfmt/binding-openharmony-arm64": "0.44.0", "@oxfmt/binding-win32-arm64-msvc": "0.44.0", "@oxfmt/binding-win32-ia32-msvc": "0.44.0", "@oxfmt/binding-win32-x64-msvc": "0.44.0" }, "bin": { "oxfmt": "bin/oxfmt" } }, "sha512-lnncqvHewyRvaqdrnntVIrZV2tEddz8lbvPsQzG/zlkfvgZkwy0HP1p/2u1aCDToeg1jb9zBpbJdfkV73Itw+w=="],
 
