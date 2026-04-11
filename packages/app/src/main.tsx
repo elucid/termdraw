@@ -1,17 +1,14 @@
-#!/usr/bin/env bun
-
 import { createCliRenderer } from "@opentui/core";
 import { createRoot } from "@opentui/react";
-import { buildHelpText, formatSavedOutput } from "./app.js";
-import { TermDrawApp } from "./react.js";
+import { buildHelpText, formatSavedOutput, TermDrawApp } from "@termdraw/opentui";
 
-interface CliOptions {
+export interface CliOptions {
   outputPath?: string;
   fenced: boolean;
   help: boolean;
 }
 
-function parseArgs(argv: string[]): CliOptions {
+export function parseArgs(argv: string[]): CliOptions {
   const options: CliOptions = {
     fenced: false,
     help: false,
@@ -55,11 +52,11 @@ function withTrailingNewline(text: string): string {
   return text.endsWith("\n") ? text : `${text}\n`;
 }
 
-async function main(): Promise<void> {
-  const options = parseArgs(Bun.argv.slice(2));
+export async function runTermDrawAppCli(argv = Bun.argv.slice(2)): Promise<void> {
+  const options = parseArgs(argv);
 
   if (options.help) {
-    process.stdout.write(buildHelpText("bun run start --"));
+    process.stdout.write(buildHelpText("termdraw"));
     return;
   }
 
@@ -113,9 +110,3 @@ async function main(): Promise<void> {
     />,
   );
 }
-
-main().catch((error) => {
-  const message = error instanceof Error ? error.message : String(error);
-  process.stderr.write(`${message}\n`);
-  process.exit(1);
-});

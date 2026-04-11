@@ -1,111 +1,57 @@
 # termDRAW!
 
-termDRAW! is an object-based terminal illustrator for diagrams, UI mocks, and terminal-native graphics.
+termDRAW! is a terminal drawing editor for developers who want editable diagrams, UI mocks, and text graphics without leaving the terminal.
 
-## Why termDRAW!
+## Packages
 
-- Make terminal-native diagrams without leaving your terminal.
-- Keep editing as you think: drawn elements stay selectable, movable, and resizable.
-- Group related content inside boxes so diagrams stay organized while you iterate.
-- Export plain text or fenced Markdown for READMEs, docs, tickets, and agent prompts.
+- `@termdraw/app` — the standalone terminal app with the `termdraw` command
+- `@termdraw/opentui` — embeddable OpenTUI components and renderables
+- `@termdraw/pi` — Pi package that opens termDRAW in a Pi overlay
 
-## Install
+## Install the app
 
 Requirements:
 
-- [Bun](https://bun.sh)
+- [Bun](https://bun.sh) 1.3+
 - A terminal with mouse support
 
-From npm:
-
 ```bash
-bun add @benvinegar/termdraw
-```
-
-Or from source:
-
-```bash
-git clone https://github.com/benvinegar/termdraw.git
-cd termdraw
-bun install
+npm install --global @termdraw/app
 ```
 
 ## Quick start
 
-Start the app from a local checkout:
-
 ```bash
-bun run start
+termdraw
 ```
 
-Or run the published CLI:
+Draw something, then press `Enter` or `Ctrl+S` to write the result to stdout.
+
+## App usage
 
 ```bash
-bunx @benvinegar/termdraw
+# save plain text directly to a file
+termdraw --output diagram.txt
+
+# export a fenced Markdown code block
+termdraw --fenced > diagram.md
+
+# show CLI help
+termdraw --help
 ```
 
-Draw something, then press `Enter` or `Ctrl+S` to save. By default, termDRAW! writes the result to stdout after the app exits.
+termDRAW! outputs terminal text, not SVG or bitmap graphics.
 
-Write directly to a file:
+## Embed in an OpenTUI app
 
 ```bash
-bun run start -- --output diagram.txt
+npm install @termdraw/opentui @opentui/core @opentui/react react
 ```
-
-Export as a fenced Markdown code block:
-
-```bash
-bun run start -- --fenced > diagram.md
-```
-
-Show CLI help:
-
-```bash
-bun run start -- --help
-```
-
-## Usage
-
-termDRAW! behaves more like a small vector-style editor than a paint program. Lines, boxes, and text are retained objects, so you can keep rearranging the diagram after you draw it. Boxes can also act as frames for fully contained children.
-
-Everything still snaps to terminal cells. termDRAW! outputs terminal art, not SVG or bitmap graphics.
-
-Controls are shown in the app footer and tool palette.
-
-## Output examples
-
-Plain text to stdout:
-
-```bash
-bun run start > drawing.txt
-```
-
-Plain text to a file:
-
-```bash
-bun run start -- --output drawing.txt
-```
-
-Markdown fenced output:
-
-```bash
-bun run start -- --fenced > drawing.md
-```
-
-## Embedding
-
-termDRAW! can also be mounted as OpenTUI React components inside another terminal app.
-
-- `TermDrawApp`: the full app chrome with header, palette, footer, and splash
-- `TermDrawEditor`: the bare editor surface without the surrounding app chrome
-- `TermDraw`: an alias for `TermDrawApp`
-
-Full chrome:
 
 ```tsx
 import { createCliRenderer } from "@opentui/core";
 import { createRoot } from "@opentui/react";
-import { TermDrawApp } from "@benvinegar/termdraw";
+import { TermDrawApp } from "@termdraw/opentui";
 
 const renderer = await createCliRenderer({
   useMouse: true,
@@ -129,29 +75,34 @@ createRoot(renderer).render(
 );
 ```
 
-Bare editor surface:
+Also exported from `@termdraw/opentui`:
 
-```tsx
-import { TermDrawEditor } from "@benvinegar/termdraw";
+- `TermDrawApp`
+- `TermDrawEditor`
+- `TermDraw`
+- `TermDrawAppRenderable`
+- `TermDrawEditorRenderable`
+- `TermDrawRenderable`
+- `formatSavedOutput`
+- `buildHelpText`
 
-<TermDrawEditor width="100%" height="100%" autoFocus onSave={(art) => console.log(art)} />;
-```
-
-## Development
-
-This repo is organized as a small workspace:
-
-- `packages/tui` — the main `@benvinegar/termdraw` OpenTUI app/library package
-- `packages/pi` — the Pi embedding prototype package
-
-From the repo root, the main scripts still proxy to the TUI package and shared checks:
+## Use it in Pi
 
 ```bash
-bun run format
-bun run lint
-bun test
-bun run typecheck
+pi install npm:@termdraw/pi
 ```
+
+Then inside Pi:
+
+```text
+/termdraw
+```
+
+## Docs
+
+- App package: [`packages/app`](https://github.com/benvinegar/termdraw/tree/main/packages/app)
+- OpenTUI package: [`packages/opentui`](https://github.com/benvinegar/termdraw/tree/main/packages/opentui)
+- Pi package: [`packages/pi`](https://github.com/benvinegar/termdraw/tree/main/packages/pi)
 
 ## Contributing
 
@@ -160,19 +111,16 @@ Contributions are welcome.
 Before opening a PR:
 
 - keep the change focused
-- run `bun run format`, `bun run lint`, `bun test`, and `bun run typecheck`
-- add or update tests when you change editor behavior
-- open an issue first for larger UX or architecture changes
+- run `bun run check`
+- add or update tests when editor behavior changes
+- open an issue first for larger UX or API changes
+
+## Security
+
+Please report security issues privately through GitHub Security Advisories:
+
+- <https://github.com/benvinegar/termdraw/security/advisories/new>
 
 ## License
 
 MIT. See [LICENSE](LICENSE).
-
-## Publishing note
-
-The unscoped `termdraw` package name is already taken on npm, so this package is configured to publish as `@benvinegar/termdraw`.
-
-## Support
-
-- Bugs and feature requests: [GitHub issues](https://github.com/benvinegar/termdraw/issues)
-- Source: [github.com/benvinegar/termdraw](https://github.com/benvinegar/termdraw)
