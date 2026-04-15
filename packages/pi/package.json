@@ -35,7 +35,7 @@
     "@benvinegar/termdraw": "file:../tui",
     "@opentui/core": "^0.1.97",
     "@opentui/react": "^0.1.97",
-    "opentui-island": "^0.3.0",
+    "opentui-island": "^0.4.0",
     "react": "^19.2.0"
   },
   "devDependencies": {

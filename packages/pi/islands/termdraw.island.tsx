@@ -1,6 +1,6 @@
 /** @jsxImportSource @opentui/react */
 
-import { useOpenTuiIslandBridge } from "opentui-island";
+import { useIslandBridge } from "opentui-island";
 import { TermDrawApp } from "@benvinegar/termdraw";
 
 type PiTermDrawIslandProps = {
@@ -12,7 +12,7 @@ export default function PiTermDrawIsland({
   showStartupLogo = false,
   footerText,
 }: PiTermDrawIslandProps) {
-  const bridge = useOpenTuiIslandBridge();
+  const bridge = useIslandBridge();
 
   return (
     <TermDrawApp

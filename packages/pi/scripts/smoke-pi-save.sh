@@ -89,7 +89,6 @@ main() {
 
   printf -- 'Opening /termdraw...\n'
   tmux send-keys -t "${PANE_TARGET}" '/termdraw' Enter
-  wait_for_text 'termDRAW!' 30
   wait_for_text 'termDRAW ready.' 30
 
   printf -- 'Waiting for automated save back into Pi...\n'

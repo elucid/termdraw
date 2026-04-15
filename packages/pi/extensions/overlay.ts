@@ -8,10 +8,10 @@ import {
 } from "@mariozechner/pi-tui";
 import type { OpenTuiBridgeEvent } from "opentui-island";
 import {
-  createPiTuiOpenTuiSurface,
+  createPiTuiSurface,
   disablePiTuiMouseMode,
   enablePiTuiMouseMode,
-  type PiTuiOpenTuiSurface,
+  type PiTuiSurface,
 } from "opentui-island/pi-tui";
 
 const TERM_DRAW_ISLAND_MODULE_URL = new URL("../islands/termdraw.island.tsx", import.meta.url);
@@ -63,7 +63,7 @@ class TermDrawOverlay implements Component {
   private readonly surfaceHeight: number;
   private readonly width: number;
   private readonly smokeText: string;
-  private surface: PiTuiOpenTuiSurface | null = null;
+  private surface: PiTuiSurface | null = null;
   private unsubscribeFromEvents: (() => void) | null = null;
   private status = LOADING_STATUS;
   private error: string | null = null;
@@ -83,7 +83,7 @@ class TermDrawOverlay implements Component {
 
   private async initialize(): Promise<void> {
     try {
-      this.surface = await createPiTuiOpenTuiSurface({
+      this.surface = await createPiTuiSurface({
         height: this.surfaceHeight,
         initialWidth: this.width,
         requestRender: () => this.tui.requestRender(),

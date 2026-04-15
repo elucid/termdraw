@@ -76,6 +76,6 @@ Inside Pi:
 
 - Requires Bun 1.3+ on the machine running Pi.
 - The embedded island currently loads from source (`islands/termdraw.island.tsx`) via Bun.
-- For local development, `opentui-island@0.3.0` is used for save/cancel result bridging. Its optional `@mariozechner/pi-tui` peer range is still older than current Pi packages, so `npm` users may still need `--legacy-peer-deps` in some setups.
+- For local development, `opentui-island@0.4.x` is used for save/cancel result bridging.
 - Before publishing `pi-termdraw`, switch the local `file:../tui` dependency back to a real semver release of `@benvinegar/termdraw`.
 - This package targets the terminal Pi experience first. GUI support will depend on Pi's extension UI surface.
