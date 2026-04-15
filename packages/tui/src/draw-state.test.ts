@@ -185,6 +185,37 @@ describe("DrawState", () => {
     expect(state.getCompositeCell(2, 1)).toBe("┌");
   });
 
+  test("line styles can draw smooth, single, and double borders", () => {
+    const state = new DrawState(30, 12);
+
+    const smoothStart = canvasPoint(state, 0, 0);
+    const smoothEnd = canvasPoint(state, 6, 2);
+    state.handlePointerEvent({ type: "down", button: MouseButton.LEFT, ...smoothStart });
+    state.handlePointerEvent({ type: "drag", button: MouseButton.LEFT, ...smoothEnd });
+    state.handlePointerEvent({ type: "up", button: MouseButton.LEFT, ...smoothEnd });
+    const smoothChar = state.getCompositeCell(1, 0);
+    expect((smoothChar.codePointAt(0) ?? 0) >= 0x2800).toBe(true);
+
+    state.setLineStyle("light");
+    const lightStart = canvasPoint(state, 8, 0);
+    const lightEnd = canvasPoint(state, 12, 0);
+    state.handlePointerEvent({ type: "down", button: MouseButton.LEFT, ...lightStart });
+    state.handlePointerEvent({ type: "drag", button: MouseButton.LEFT, ...lightEnd });
+    state.handlePointerEvent({ type: "up", button: MouseButton.LEFT, ...lightEnd });
+
+    state.setLineStyle("double");
+    const doubleStart = canvasPoint(state, 14, 0);
+    const doubleEnd = canvasPoint(state, 18, 0);
+    state.handlePointerEvent({ type: "down", button: MouseButton.LEFT, ...doubleStart });
+    state.handlePointerEvent({ type: "drag", button: MouseButton.LEFT, ...doubleEnd });
+    state.handlePointerEvent({ type: "up", button: MouseButton.LEFT, ...doubleEnd });
+
+    expect(state.getCompositeCell(8, 0)).toBe("─");
+    expect(state.getCompositeCell(12, 0)).toBe("─");
+    expect(state.getCompositeCell(14, 0)).toBe("═");
+    expect(state.getCompositeCell(18, 0)).toBe("═");
+  });
+
   test("box styles can draw single and double borders", () => {
     const state = new DrawState(30, 12);
     state.setMode("box");

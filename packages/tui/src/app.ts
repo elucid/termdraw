@@ -19,6 +19,7 @@ import {
   type CanvasInsets,
   type DrawMode,
   type InkColor,
+  type LineStyle,
   type PointerEventLike,
 } from "./draw-state.js";
 
@@ -85,7 +86,7 @@ type ToolButton = {
 };
 
 type StyleButton = {
-  style: BoxStyle;
+  style: BoxStyle | LineStyle;
   left: number;
   top: number;
   width: number;
@@ -105,6 +106,12 @@ const BOX_STYLE_OPTIONS: { style: BoxStyle; sample: string; label: string }[] = 
   { style: "light", sample: "┌─┐", label: "Single" },
   { style: "heavy", sample: "┏━┓", label: "Heavy" },
   { style: "double", sample: "╔═╗", label: "Double" },
+];
+
+const LINE_STYLE_OPTIONS: { style: LineStyle; sample: string; label: string }[] = [
+  { style: "smooth", sample: "⠉⠒", label: "Smooth" },
+  { style: "light", sample: "─│", label: "Single" },
+  { style: "double", sample: "═║", label: "Double" },
 ];
 
 const INK_COLOR_VALUES: Record<InkColor, RGBA> = {
@@ -348,8 +355,13 @@ export class TermDrawRenderable extends FrameBufferRenderable {
 
       if (styleButton) {
         if (event.type === "down" && event.button === MouseButton.LEFT) {
-          this.state.setMode("box");
-          this.state.setBoxStyle(styleButton.style);
+          if (this.state.currentMode === "box") {
+            this.state.setMode("box");
+            this.state.setBoxStyle(styleButton.style as BoxStyle);
+          } else if (this.state.currentMode === "line") {
+            this.state.setMode("line");
+            this.state.setLineStyle(styleButton.style as LineStyle);
+          }
           this.requestRender();
         }
         event.preventDefault();
@@ -548,6 +560,20 @@ export class TermDrawRenderable extends FrameBufferRenderable {
     }
 
     if (this.state.currentMode === "line") {
+      if (key.raw === "[") {
+        key.preventDefault();
+        this.state.cycleLineStyle(-1);
+        this.requestRender();
+        return true;
+      }
+
+      if (key.raw === "]") {
+        key.preventDefault();
+        this.state.cycleLineStyle(1);
+        this.requestRender();
+        return true;
+      }
+
       if (name === "space") {
         key.preventDefault();
         this.state.stampBrushAtCursor();
@@ -676,7 +702,9 @@ export class TermDrawRenderable extends FrameBufferRenderable {
   }
 
   private getContextualStyleRowCount(): number {
-    return this.state.currentMode === "box" ? BOX_STYLE_OPTIONS.length : 0;
+    if (this.state.currentMode === "box") return BOX_STYLE_OPTIONS.length;
+    if (this.state.currentMode === "line") return LINE_STYLE_OPTIONS.length;
+    return 0;
   }
 
   private getToolButtons(layout: AppLayout): ToolButton[] {
@@ -711,13 +739,16 @@ export class TermDrawRenderable extends FrameBufferRenderable {
   }
 
   private getContextualStyleButtons(layout: AppLayout): StyleButton[] {
-    if (this.state.currentMode !== "box") return [];
+    if (this.state.currentMode !== "box" && this.state.currentMode !== "line") return [];
 
     const buttonLeft = this.getPaletteButtonLeft(layout);
-    const activeButton = this.getToolButtons(layout).find((button) => button.mode === "box");
+    const activeButton = this.getToolButtons(layout).find(
+      (button) => button.mode === this.state.currentMode,
+    );
     if (!activeButton) return [];
 
-    return BOX_STYLE_OPTIONS.map((option, index) => ({
+    const options = this.state.currentMode === "box" ? BOX_STYLE_OPTIONS : LINE_STYLE_OPTIONS;
+    return options.map((option, index) => ({
       style: option.style,
       left: buttonLeft,
       top: activeButton.top + TOOL_BUTTON_HEIGHT + index,
@@ -861,6 +892,19 @@ export class TermDrawRenderable extends FrameBufferRenderable {
         COLORS.warning,
         COLORS.panel,
       );
+    } else if (this.state.currentMode === "line") {
+      const lineStyle =
+        LINE_STYLE_OPTIONS.find((option) => option.style === this.state.currentLineStyle) ??
+        LINE_STYLE_OPTIONS[0]!;
+      x = drawSegment(this.frameBuffer, x, y, "  style:", COLORS.dim, COLORS.panel);
+      x = drawSegment(
+        this.frameBuffer,
+        x,
+        y,
+        `${lineStyle.sample} ${lineStyle.label}`,
+        COLORS.accent,
+        COLORS.panel,
+      );
     }
 
     x = drawSegment(this.frameBuffer, x, y, "  color:", COLORS.dim, COLORS.panel);
@@ -968,7 +1012,10 @@ export class TermDrawRenderable extends FrameBufferRenderable {
   }
 
   private drawStyleButton(button: StyleButton): void {
-    const isActive = this.state.currentBoxStyle === button.style;
+    const isActive =
+      this.state.currentMode === "box"
+        ? this.state.currentBoxStyle === button.style
+        : this.state.currentLineStyle === button.style;
     const fg = isActive ? COLORS.panel : COLORS.text;
     const bg = isActive ? COLORS.warning : COLORS.panel;
     const text = padToWidth(`${button.sample} ${button.label}`, button.width);
@@ -1158,7 +1205,7 @@ export function buildHelpText(binaryName = "termdraw"): string {
       `  select tool     click to select, drag empty space to marquee-select multiple objects\n` +
       `  click objects   select and move them\n` +
       `  drag handles    resize boxes / adjust line endpoints\n` +
-      `  line tool       automatically chooses clean line glyphs, using Braille for sub-cell shallow/steep angles\n` +
+      `  line tool       choose Smooth (Braille-aware), Single, or Double line stencils\n` +
       `  Shift + drag    constrain line creation/editing to horizontal or vertical\n` +
       `  selected text   shows a virtual selection box\n` +
       `  Delete          remove selected object\n` +
@@ -1166,8 +1213,8 @@ export function buildHelpText(binaryName = "termdraw"): string {
       `  Ctrl+Q          quit\n` +
       `  Ctrl+Z / Ctrl+Y undo / redo\n` +
       `  Ctrl+X          clear canvas\n` +
-      `  [ / ]           cycle box style in Box mode or brush in Brush mode\n` +
-      `  mouse wheel     cycle box style in Box mode or brush in Brush mode\n` +
+      `  [ / ]           cycle box style in Box mode, line style in Line mode, or brush in Brush mode\n` +
+      `  mouse wheel     cycle box style in Box mode, line style in Line mode, or brush in Brush mode\n` +
       `  Space           stamp a line point or current brush / insert space in Text mode\n` +
       `  Enter / Ctrl+S  save\n\n` +
       `Options:\n` +
