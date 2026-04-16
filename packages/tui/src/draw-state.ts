@@ -82,6 +82,7 @@ type Snapshot = {
   objects: DrawObject[];
   selectedObjectIds: string[];
   selectedObjectId: string | null;
+  activeTextObjectId: string | null;
   cursorX: number;
   cursorY: number;
   nextObjectNumber: number;
@@ -861,6 +862,7 @@ export class DrawState {
   private selectedObjectIds: string[] = [];
   private selectedObjectId: string | null = null;
   private activeTextObjectId: string | null = null;
+  private textEntryArmed = false;
 
   private pendingSelection: PendingSelection | null = null;
   private pendingLine: PendingLine | null = null;
@@ -941,6 +943,10 @@ export class DrawState {
 
   public get isEditingText(): boolean {
     return this.getActiveTextObject() !== null;
+  }
+
+  public get isTextEntryArmed(): boolean {
+    return this.textEntryArmed;
   }
 
   public get hasActivePointerInteraction(): boolean {
@@ -1223,9 +1229,11 @@ export class DrawState {
   }
 
   public clearSelection(): boolean {
-    const hadSelection = this.selectedObjectIds.length > 0 || this.activeTextObjectId !== null;
+    const hadSelection =
+      this.selectedObjectIds.length > 0 || this.activeTextObjectId !== null || this.textEntryArmed;
     this.setSelectedObjects([]);
     this.activeTextObjectId = null;
+    this.textEntryArmed = false;
     this.setStatus(hadSelection ? "Selection cleared." : "Nothing selected.");
     return hadSelection;
   }
@@ -1440,6 +1448,11 @@ export class DrawState {
   }
 
   public insertCharacter(input: string): void {
+    if (!this.textEntryArmed && !this.getActiveTextObject()) {
+      this.setStatus("Click to start a text box, or click existing text to edit it.");
+      return;
+    }
+
     const char = normalizeCellCharacter(input);
     this.pushUndo();
 
@@ -1452,6 +1465,7 @@ export class DrawState {
       this.replaceObject(updated);
       this.setSelectedObjects([updated.id], updated.id);
       this.activeTextObjectId = updated.id;
+      this.textEntryArmed = true;
       this.cursorX = Math.min(this.canvasWidth - 1, updated.x + visibleCellCount(updated.content));
       this.cursorY = updated.y;
       this.setStatus(`Appended "${char}" to ${this.describeObject(updated)}.`);
@@ -1471,6 +1485,7 @@ export class DrawState {
     this.setObjects([...this.objects, object]);
     this.setSelectedObjects([object.id], object.id);
     this.activeTextObjectId = object.id;
+    this.textEntryArmed = true;
     this.cursorX = Math.min(this.canvasWidth - 1, this.cursorX + 1);
     this.setStatus(`Created ${this.describeObject(this.getObjectById(object.id) ?? object)}.`);
   }
@@ -1491,6 +1506,7 @@ export class DrawState {
       this.removeObjectById(activeObject.id);
       this.setSelectedObjects([]);
       this.activeTextObjectId = null;
+      this.textEntryArmed = false;
       this.cursorX = activeObject.x;
       this.cursorY = activeObject.y;
       this.setStatus(`Removed ${this.describeObject(activeObject)}.`);
@@ -1504,6 +1520,7 @@ export class DrawState {
     this.replaceObject(updated);
     this.setSelectedObjects([updated.id], updated.id);
     this.activeTextObjectId = updated.id;
+    this.textEntryArmed = true;
     this.cursorX = Math.min(this.canvasWidth - 1, updated.x + visibleCellCount(updated.content));
     this.cursorY = updated.y;
     this.setStatus(`Backspaced ${this.describeObject(updated)}.`);
@@ -1686,7 +1703,10 @@ export class DrawState {
   private placeTextCursor(x: number, y: number): void {
     this.setSelectedObjects([]);
     this.activeTextObjectId = null;
-    this.setStatus(`Text cursor ${x + 1},${y + 1}.`);
+    this.textEntryArmed = true;
+    this.cursorX = x;
+    this.cursorY = y;
+    this.setStatus(`Text box start at ${x + 1},${y + 1}. Type to begin, Esc to stop typing.`);
   }
 
   private beginEraseSession(): void {
@@ -1847,6 +1867,7 @@ export class DrawState {
         if (dragState.kind === "move" && dragState.textEditOnClick && object?.type === "text") {
           this.setSelectedObjects([object.id], object.id);
           this.activeTextObjectId = object.id;
+          this.textEntryArmed = true;
           this.cursorX = Math.min(
             this.canvasWidth - 1,
             object.x + visibleCellCount(object.content),
@@ -2001,6 +2022,7 @@ export class DrawState {
     }
     if (this.activeTextObjectId === hit.id) {
       this.activeTextObjectId = null;
+      this.textEntryArmed = false;
     }
     this.setStatus(`Deleted ${this.describeObject(hit)}.`);
   }
@@ -2014,6 +2036,7 @@ export class DrawState {
     this.setSelectedObjects([]);
     if (this.activeTextObjectId === hit.id) {
       this.activeTextObjectId = null;
+      this.textEntryArmed = false;
     }
     this.setStatus(`Deleted ${this.describeObject(hit)}.`);
     return true;
@@ -2024,6 +2047,7 @@ export class DrawState {
       objects: cloneObjects(this.objects),
       selectedObjectIds: [...this.selectedObjectIds],
       selectedObjectId: this.selectedObjectId,
+      activeTextObjectId: this.activeTextObjectId,
       cursorX: this.cursorX,
       cursorY: this.cursorY,
       nextObjectNumber: this.nextObjectNumber,
@@ -2045,12 +2069,13 @@ export class DrawState {
     );
     this.selectedObjectIds = [...snapshot.selectedObjectIds];
     this.selectedObjectId = snapshot.selectedObjectId;
+    this.activeTextObjectId = snapshot.activeTextObjectId;
     this.syncSelection();
     this.cursorX = Math.max(0, Math.min(snapshot.cursorX, this.canvasWidth - 1));
     this.cursorY = Math.max(0, Math.min(snapshot.cursorY, this.canvasHeight - 1));
     this.nextObjectNumber = snapshot.nextObjectNumber;
     this.nextZIndex = snapshot.nextZIndex;
-    this.activeTextObjectId = null;
+    this.textEntryArmed = this.activeTextObjectId !== null;
     this.pendingSelection = null;
     this.pendingLine = null;
     this.pendingBox = null;

@@ -457,7 +457,10 @@ export class TermDrawRenderable extends FrameBufferRenderable {
     }
 
     const toolHotkeyMode =
-      this.state.currentMode === "text" || key.ctrl || key.meta || key.option
+      (this.state.currentMode === "text" && this.state.isTextEntryArmed) ||
+      key.ctrl ||
+      key.meta ||
+      key.option
         ? null
         : (TOOL_HOTKEYS[name] ?? null);
     if (toolHotkeyMode) {

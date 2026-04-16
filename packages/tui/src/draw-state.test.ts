@@ -653,6 +653,37 @@ describe("DrawState", () => {
     expect(state.exportArt()).toBe("  H i");
   });
 
+  test("text mode requires clicking to start typing and Escape exits typing", () => {
+    const state = new DrawState(30, 12);
+    state.setMode("text");
+
+    state.insertCharacter("a");
+    expect(state.exportArt()).toBe("");
+
+    state.handlePointerEvent({
+      type: "down",
+      button: MouseButton.LEFT,
+      ...canvasPoint(state, 2, 2),
+    });
+    state.insertCharacter("H");
+    state.insertCharacter("i");
+    expect(state.getCompositeCell(2, 2)).toBe("H");
+    expect(state.getCompositeCell(3, 2)).toBe("i");
+
+    state.clearSelection();
+    state.insertCharacter("a");
+    expect(state.exportArt()).toBe("  Hi");
+
+    state.handlePointerEvent({
+      type: "down",
+      button: MouseButton.LEFT,
+      ...canvasPoint(state, 2, 2),
+    });
+    state.handlePointerEvent({ type: "up", button: MouseButton.LEFT, ...canvasPoint(state, 2, 2) });
+    state.insertCharacter("!");
+    expect(state.getCompositeCell(4, 2)).toBe("!");
+  });
+
   test("text mode click still edits text while drag moves it", () => {
     const state = new DrawState(30, 12);
     state.setMode("text");
