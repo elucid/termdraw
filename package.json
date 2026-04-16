@@ -4,6 +4,11 @@
   "workspaces": [
     "packages/*"
   ],
+  "pi": {
+    "extensions": [
+      "./packages/pi/extensions"
+    ]
+  },
   "scripts": {
     "start": "bun run index.ts",
     "dev": "cd packages/app && bun --watch run src/cli.tsx",
