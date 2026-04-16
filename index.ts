@@ -1,5 +1,5 @@
-export * from "./packages/tui/index.ts";
+export * from "./packages/opentui/index.ts";
 
 if (import.meta.main) {
-  await import("./packages/tui/src/cli.tsx");
+  await import("./packages/app/src/cli.tsx");
 }

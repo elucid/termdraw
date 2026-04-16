@@ -1,5 +1,5 @@
 {
-  "name": "pi-termdraw",
+  "name": "@termdraw/pi",
   "version": "0.1.0",
   "description": "Pi extension package that embeds termDRAW inside Pi via opentui-island.",
   "keywords": [
@@ -10,7 +10,7 @@
     "terminal",
     "tui"
   ],
-  "homepage": "https://github.com/benvinegar/termdraw#readme",
+  "homepage": "https://github.com/benvinegar/termdraw/tree/main/packages/pi#readme",
   "bugs": {
     "url": "https://github.com/benvinegar/termdraw/issues"
   },
@@ -27,14 +27,18 @@
     "LICENSE"
   ],
   "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
+    "pack:check": "npm pack --dry-run --ignore-scripts",
     "smoke:pi": "bash ./scripts/smoke-pi-save.sh"
   },
   "dependencies": {
-    "@benvinegar/termdraw": "file:../tui",
     "@opentui/core": "^0.1.97",
     "@opentui/react": "^0.1.97",
+    "@termdraw/opentui": "0.3.0",
     "opentui-island": "^0.4.0",
     "react": "^19.2.0"
   },

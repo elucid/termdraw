@@ -12,6 +12,17 @@ All notable user-visible changes to this project are documented in this file.
 
 ### Fixed
 
+## [0.3.0]
+
+Splits the published surface into dedicated app, OpenTUI, and Pi packages.
+
+### Highlights
+
+- publishes the standalone terminal app as `@termdraw/app`
+- publishes the embeddable OpenTUI package as `@termdraw/opentui`
+- publishes the Pi integration as `@termdraw/pi`
+- keeps the `termdraw` executable as the main app entrypoint
+
 ## [0.2.0]
 
 ### Added
@@ -37,5 +48,3 @@ All notable user-visible changes to this project are documented in this file.
 - Added embeddable OpenTUI React components:
   - `TermDrawApp` for the full chrome
   - `TermDrawEditor` for the bare editor surface
-- Added publish-ready npm package configuration and the `termdraw` CLI entrypoint.
-- Added the scoped npm package surface as `@benvinegar/termdraw`.

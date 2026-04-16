@@ -2,15 +2,13 @@
 
 termDRAW! is a terminal drawing editor for developers who want editable diagrams, UI mocks, and text graphics without leaving the terminal.
 
-## What it does
+## Packages
 
-- Draw boxes, lines, paint strokes, and text as retained objects.
-- Select, move, resize, and recolor objects after you draw them.
-- Group related content inside boxes while everything stays aligned to terminal cells.
-- Export plain text or fenced Markdown for READMEs, docs, tickets, and prompts.
-- Embed the editor in OpenTUI apps with React components.
+- `@termdraw/app` — the standalone terminal app with the `termdraw` command
+- `@termdraw/opentui` — embeddable OpenTUI components and renderables
+- `@termdraw/pi` — Pi package that opens termDRAW in a Pi overlay
 
-## Install
+## Install the app
 
 Requirements:
 
@@ -18,7 +16,7 @@ Requirements:
 - A terminal with mouse support
 
 ```bash
-npm install --global @benvinegar/termdraw
+npm install --global @termdraw/app
 ```
 
 ## Quick start
@@ -29,15 +27,7 @@ termdraw
 
 Draw something, then press `Enter` or `Ctrl+S` to write the result to stdout.
 
-## Usage
-
-termDRAW! behaves more like a small vector-style editor than a paint program. Lines, boxes, paint strokes, and text are retained objects, so you can keep rearranging the diagram after you draw it. Boxes can also act as frames for fully contained children.
-
-Everything still snaps to terminal cells. termDRAW! outputs terminal art, not SVG or bitmap graphics.
-
-Controls are shown in the app footer and tool palette. Tool hotkeys follow common graphics-editor muscle memory: `B` Brush, `A` Select, `U` Box, `P` Line, `T` Text. The Line tool supports Smooth, Single, and Double line stencils.
-
-## Output examples
+## App usage
 
 ```bash
 # save plain text directly to a file
@@ -50,18 +40,18 @@ termdraw --fenced > diagram.md
 termdraw --help
 ```
 
+termDRAW! outputs terminal text, not SVG or bitmap graphics.
+
 ## Embed in an OpenTUI app
 
-Install the package and peer dependencies:
-
 ```bash
-npm install @benvinegar/termdraw @opentui/core @opentui/react react
+npm install @termdraw/opentui @opentui/core @opentui/react react
 ```
 
 ```tsx
 import { createCliRenderer } from "@opentui/core";
 import { createRoot } from "@opentui/react";
-import { TermDrawApp } from "@benvinegar/termdraw";
+import { TermDrawApp } from "@termdraw/opentui";
 
 const renderer = await createCliRenderer({
   useMouse: true,
@@ -85,17 +75,34 @@ createRoot(renderer).render(
 );
 ```
 
-Also exported:
+Also exported from `@termdraw/opentui`:
 
-- `TermDrawApp` — full app chrome with header, palette, footer, and splash
-- `TermDrawEditor` — bare editor surface without surrounding chrome
-- `TermDraw` — alias for `TermDrawApp`
+- `TermDrawApp`
+- `TermDrawEditor`
+- `TermDraw`
+- `TermDrawAppRenderable`
+- `TermDrawEditorRenderable`
+- `TermDrawRenderable`
+- `formatSavedOutput`
+- `buildHelpText`
+
+## Use it in Pi
+
+```bash
+pi install npm:@termdraw/pi
+```
+
+Then inside Pi:
+
+```text
+/termdraw
+```
 
 ## Docs
 
-- CLI reference: run `termdraw --help`
-- React exports: [`packages/tui/src/index.ts`](https://github.com/benvinegar/termdraw/blob/main/packages/tui/src/index.ts)
-- Pi embedding example: [`packages/pi`](https://github.com/benvinegar/termdraw/tree/main/packages/pi)
+- App package: [`packages/app`](https://github.com/benvinegar/termdraw/tree/main/packages/app)
+- OpenTUI package: [`packages/opentui`](https://github.com/benvinegar/termdraw/tree/main/packages/opentui)
+- Pi package: [`packages/pi`](https://github.com/benvinegar/termdraw/tree/main/packages/pi)
 
 ## Contributing
 
